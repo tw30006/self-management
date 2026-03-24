@@ -1,0 +1,41 @@
+// Prisma schema — 描述資料庫的「藍圖」
+// Prisma 7 的連線設定已移至 prisma.config.ts
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  // Prisma 7 起，URL 改在 prisma.config.ts 設定
+  provider = "postgresql"
+}
+
+// 使用者資料表
+model User {
+  id        Int        @id @default(autoincrement())
+  email     String     @unique
+  password  String     // 儲存 bcrypt hash，絕不存明文
+  createdAt DateTime   @default(now()) @map("created_at")
+  trainings Training[]
+
+  @@map("users")
+}
+
+// 訓練紀錄資料表
+model Training {
+  id          Int      @id @default(autoincrement())
+  userId      Int      @map("user_id")
+  performedAt DateTime @map("performed_at") // 訓練執行時間
+  actionName  String   @map("action_name")  // 動作名稱，例如「深蹲」
+  sets        Int                           // 組數
+  reps        Int                           // 次數
+  weight      Decimal  @db.Decimal(6, 2)    // 重量（公斤），支援小數
+  heartRate   Int?     @map("heart_rate")   // 心率（選填）
+  notes       String?                       // 備注（選填）
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("trainings")
+}
