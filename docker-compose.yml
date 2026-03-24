@@ -1,4 +1,41 @@
 services:
+  # ── 資料庫 ─────────────────────────────────────────
+  db:
+    image: postgres:16-alpine
+    container_name: self-management-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: self_management
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # ── 後端 API ───────────────────────────────────────
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.dev
+    container_name: self-management-backend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./backend:/app
+      - /app/node_modules
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=postgresql://postgres:postgres@db:5432/self_management?schema=public
+      # JWT_SECRET 應從外部環境注入，請勿硬編碼真實 secret
+      - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
+      - PORT=3000
+      - CORS_ORIGIN=http://localhost:5173
+    depends_on:
+      - db
+    restart: unless-stopped
+
+  # ── 前端 ────────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
@@ -23,3 +60,6 @@ services:
     ports:
       - "8080:80"
     restart: unless-stopped
+
+volumes:
+  db_data:

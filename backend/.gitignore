@@ -1,0 +1,14 @@
+# Node.js
+node_modules/
+dist/
+
+# 環境變數（絕對不要提交真實的 .env）
+.env
+.env.local
+.env.*.local
+
+# 測試覆蓋率報告
+coverage/
+
+# OS 雜項
+.DS_Store
