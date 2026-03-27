@@ -5,7 +5,7 @@
 import { z } from "zod";
 
 export const registerSchema = z.object({
-  email: z.string().email("請輸入有效的 email 格式"),
+  email: z.email("請輸入有效的 email 格式"),
   password: z.string().min(8, "密碼至少需要 8 個字元"),
 });
 

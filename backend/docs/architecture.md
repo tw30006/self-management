@@ -163,7 +163,6 @@ err 是 ZodError？  → 回傳 400 + VALIDATION_ERROR
 | 檔案 | 用途 |
 |------|------|
 | `training.prompt.md` | Training API 的完整實作規格書（9 個步驟） |
-| `copilot-instructions.md` | 團隊 coding style 規範，Copilot 產生程式碼時遵循 |
 
 ---
 
