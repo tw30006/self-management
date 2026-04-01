@@ -20,7 +20,7 @@ services:
       dockerfile: Dockerfile.dev
     container_name: self-management-backend
     ports:
-      - "3000:3000"
+      - "8080:8080"
     volumes:
       - ./backend:/app
       - /app/node_modules
@@ -29,7 +29,7 @@ services:
       - DATABASE_URL=postgresql://postgres:postgres@db:5432/self_management?schema=public
       # JWT_SECRET 應從外部環境注入，請勿硬編碼真實 secret
       - JWT_SECRET=${JWT_SECRET:-dev-secret-change-in-production}
-      - PORT=3000
+      - PORT=8080
       - CORS_ORIGIN=http://localhost:5173
     depends_on:
       - db

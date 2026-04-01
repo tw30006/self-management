@@ -53,7 +53,7 @@ cp .env.example .env
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/self_management?schema=public"
 JWT_SECRET="your-very-secret-key-here"   # 請使用隨機長字串
-PORT=3000
+PORT=8080
 NODE_ENV=development
 ```
 
@@ -81,7 +81,7 @@ npm run db:migrate
 npm run dev
 ```
 
-Server 啟動後可訪問：`http://localhost:3000`
+Server 啟動後可訪問：`http://localhost:8080`
 
 ---
 

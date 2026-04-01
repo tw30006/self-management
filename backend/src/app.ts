@@ -2,16 +2,16 @@
 // Express app 設定集中在這裡（與 server.ts 分離）
 // 好處：測試時可直接 import app，不需要實際啟動 server 監聽 port
 
+import dotenv from "dotenv";
+dotenv.config();
+
 import express from "express";
 import cors from "cors";
 import helmet from "helmet";
-import dotenv from "dotenv";
 
 import authRoutes from "./routes/auth";
 import trainingsRoutes from "./routes/trainings";
 import { errorHandler } from "./middlewares/errorHandler";
-
-dotenv.config();
 
 const app = express();
 
