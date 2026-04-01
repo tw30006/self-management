@@ -1,42 +1,97 @@
-# planLoginPrompt
+# Frontend Login Prompt (Google GSI, Step by Step)
 
-TL;DR - 在 `frontend/src/views/` 新增 `Login.vue`（Composition API），使用 Tailwind CSS，並以 Google Identity Services (GSI) 實作單一按鈕的 Google 登入（前端驗證 email，限制僅允許你本人使用，不提供註冊或密碼登入）。
+目標
 
-## Steps
+- 在前端先完成 Google 登入 UI 與基本驗證流程。
+- 只保留單一 Google 登入按鈕，不做註冊與密碼登入。
+- 目前先以前端驗證允許的 email；後續再串接後端 id_token 驗證 API。
 
-1. 建立 `frontend/src/views/Login.vue`：使用 Composition API，版面以 Tailwind 實現，畫面只包含一個 Google 登入按鈕（符合 figma）。
-2. 新增路由：在 `frontend/src/router/index.ts` 加入 `/login` 路由並指向 `Login.vue`。 (_depends on step 1_)
-3. 新增 Auth store：建立 `frontend/src/stores/auth.ts`（Pinia），儲存使用者資訊、登入/登出、以及前端的登入限制邏輯。 (_parallel with step 2_)
-4. Google Identity Services 設定：在專案加入 env 變數 `VITE_GOOGLE_CLIENT_ID`，在 `index.html` 或 `Login.vue` 動態載入 `https://accounts.google.com/gsi/client`，在 `onMounted` 初始化 GSI並 renderButton。 (_depends on step 1_)
-5. 驗證流程：`handleCredentialResponse` 取得 `credential`（id_token），在前端解碼檢查 `email` 是否為允許的帳號（限定為你自己的 email）；若需更安全，可 POST `id_token` 到後端驗證 endpoint（非必要，視需求）。
-6. 文件與 env 範例：新增或更新 `.env.example`（或 README）說明如何取得 `VITE_GOOGLE_CLIENT_ID` 與如何測試登入。 (_parallel with step 1-4_)
+TL;DR
+
+- 在 frontend/src/views/Login.vue 建立 Login 頁面（Composition API + Tailwind）。
+- 使用 Google Identity Services 載入並渲染登入按鈕。
+- 取得 credential 後解碼 id_token，檢查 email 是否為允許帳號。
+
+## Phase 1: Login 畫面與路由
+
+1. 建立 frontend/src/views/Login.vue。
+2. Login 頁面只放一個 Google 登入按鈕區塊。
+3. 在 frontend/src/router/index.ts 新增 /login 路由，指向 Login.vue。
+
+完成條件
+
+- 開啟 /login 可以看到登入頁面與按鈕容器。
+
+## Phase 2: Auth Store 與狀態管理
+
+1. 建立 frontend/src/stores/auth.ts（Pinia）。
+2. Store 內容至少包含：
+
+- user（name, email, picture）
+- isAuthenticated
+- loginWithGoogleProfile(profile)
+- logout()
+
+3. 先以前端 local state 為主，暫不綁定後端 session。
+
+完成條件
+
+- 登入成功後可寫入 store，登出後可清除狀態。
+
+## Phase 3: GSI 整合
+
+1. 新增環境變數 VITE_GOOGLE_CLIENT_ID。
+2. 在 Login.vue 動態載入 https://accounts.google.com/gsi/client。
+3. 在 onMounted 初始化 google.accounts.id.initialize。
+4. 使用 google.accounts.id.renderButton 渲染按鈕。
+5. 實作 handleCredentialResponse，取得 credential（id_token）。
+
+完成條件
+
+- 點擊按鈕可觸發 Google 登入並回傳 credential。
+
+## Phase 4: 前端帳號限制
+
+1. 前端解碼 id_token payload（只作為暫時流程，不可視為最終安全機制）。
+2. 檢查 email 是否在允許清單（例如僅你的帳號）。
+3. 若不在允許清單，顯示錯誤訊息並不登入。
+4. 若通過，寫入 auth store 並導向首頁。
+
+完成條件
+
+- 只有允許帳號可登入，其他帳號會被擋下。
+
+## Phase 5: 文件與環境設定
+
+1. 更新 frontend/.env.example（或 README）加入 VITE_GOOGLE_CLIENT_ID。
+2. 補充本機測試步驟：
+
+- 設定 env
+- 啟動前端
+- 開啟 /login 測試登入
+
+完成條件
+
+- 新同事可依文件在本機完成登入測試。
+
+## 下一階段（之後開發）
+
+- 後端新增 id_token 驗證 endpoint。
+- 前端在拿到 credential 後 POST 給後端驗證。
+- 由後端簽發自己的 JWT，前端只保存後端 token。
 
 ## Relevant files
 
-- `frontend/src/views/Login.vue` — 新增檔案，實作 UI 與 GSI 初始化/回呼。
-- `frontend/src/router/index.ts` — 新增 `/login` 路由。
-- `frontend/src/stores/auth.ts` — Pinia store 儲存 user 與登入狀態。
-- `frontend/src/api/http.ts` — 可重用的 axios 實例（若要把 id_token 傳給後端驗證）。
-- `.github/prompts/login.prompt.md` — prompt 原始需求（已被此計畫覆寫為規格文件）。
+- frontend/src/views/Login.vue
+- frontend/src/router/index.ts
+- frontend/src/stores/auth.ts
+- frontend/src/api/http.ts
+- frontend/.env.example
 
-## Verification
+## 驗收清單
 
-1. 啟動前端 (`npm run dev` 或等效命令)，開啟 `/login`，畫面上顯示與 figma 對應的單一 Google 按鈕。
-2. 點擊按鈕後成功觸發 Google 登入流程，`handleCredentialResponse` 回傳 `credential`，前端能解析並得到 `email` 與 `name`。
-3. 前端檢查 `email` 與允許清單比對（僅允許指定 email），成功後 `auth` store 有 user 資訊並將使用者導向首頁。
-4. 若選擇要後端驗證，POST `id_token` 至後端並由後端確認 token，有對應的成功/失敗回應。
-
-## Decisions / Assumptions
-
-- 使用 GSI（Google Identity Services）作為預設實作，因為 prompt 強調「畫面只有一個按鈕」且需求偏向單人快速登入（只允許你自己）。
-- 不在此階段設置完整後端或使用 Firebase，除非你要求更完整的使用者管理或更高安全度。
-- Tailwind 已在專案中可用，UI 將以 Tailwind class 實作，並盡可能符合 figma 的配色與佈局。
-
-## Further Considerations / Questions
-
-1. 你要我直接以 GSI 實作並在 repo 中新增 `Login.vue` 嗎？
-2. 想要把 id_token 送到後端驗證（需新增 backend endpoint）或僅在前端檢查 email 即可？
-3. 要不要我幫你準備 `.env.example` 範本與簡短的 README 測試步驟？
-
-目前還沒有後端API，後端需要再寫一個驗證 `id_token` 的 endpoint。(之後開發)
-let do this step by step
+1. /login 有且只有 Google 登入按鈕。
+2. Google 登入成功時可取得 credential。
+3. 僅允許指定 email 登入。
+4. 登入後 auth store 狀態正確，並可導頁。
+5. 文件包含 VITE_GOOGLE_CLIENT_ID 設定與測試步驟。
