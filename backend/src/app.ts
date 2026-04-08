@@ -3,7 +3,8 @@
 // 好處：測試時可直接 import app，不需要實際啟動 server 監聽 port
 
 import dotenv from "dotenv";
-dotenv.config();
+dotenv.config({ path: ".env" });
+dotenv.config({ path: ".env.local", override: true });
 
 import express from "express";
 import cors from "cors";

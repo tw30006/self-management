@@ -19,6 +19,9 @@ router.get("/google", googleAuth);
 // GET /auth/google/callback — Google 回調
 router.get("/google/callback", googleAuthCallback);
 
+// GET /auth/callback — 向後相容舊版 callback 路徑
+router.get("/callback", googleAuthCallback);
+
 // GET /auth/me — 取得目前使用者（cookie 或 header 驗證）
 router.get("/me", authenticate, getMe);
 
