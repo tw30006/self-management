@@ -24,7 +24,7 @@ onMounted(async () => {
   >
     <h2 class="text-2xl font-bold">Vue 3 + Vite + TS Setup Complete</h2>
     <p class="text-slate-600">
-      已完成 Pinia、Vue Router、Axios 與 Tailwind CSS v4 基礎整合。
+      已完成 Pinia、Vue Router、Fetch API 與 Tailwind CSS v4 基礎整合。
     </p>
 
     <div class="flex flex-wrap gap-3">

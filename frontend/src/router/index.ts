@@ -19,10 +19,19 @@ const router = createRouter({
   ],
 });
 
-router.beforeEach((to) => {
+router.beforeEach(async (to) => {
   const auth = useAuthStore();
+
+  if (!auth.isHydrated) {
+    await auth.hydrateSession();
+  }
+
   if (to.meta.requiresAuth && !auth.isAuthenticated) {
     return { name: "login" };
+  }
+
+  if (to.name === "login" && auth.isAuthenticated) {
+    return { name: "home" };
   }
 });
 

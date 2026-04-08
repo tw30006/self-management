@@ -1,37 +1,43 @@
 import { defineStore } from "pinia";
 import { ref, computed } from "vue";
-
-export interface UserInfo {
-  name: string;
-  email: string;
-  picture: string;
-}
+import { getMe, logout as logoutRequest, type AuthUser } from "../api/auth";
 
 export const useAuthStore = defineStore("auth", () => {
-  const user = ref<UserInfo | null>(null);
+  const user = ref<AuthUser | null>(null);
+  const isHydrated = ref(false);
 
   const isAuthenticated = computed(() => user.value !== null);
 
-  const ALLOWED_EMAIL = import.meta.env.VITE_ALLOWED_EMAIL as
-    | string
-    | undefined;
-
-  function login(userInfo: UserInfo): boolean {
-    if (ALLOWED_EMAIL && userInfo.email !== ALLOWED_EMAIL) {
-      return false;
+  async function hydrateSession(force = false) {
+    if (isHydrated.value && !force) {
+      return;
     }
-    user.value = userInfo;
-    return true;
+
+    try {
+      user.value = await getMe();
+    } catch {
+      user.value = null;
+    } finally {
+      isHydrated.value = true;
+    }
   }
 
-  function logout() {
+  async function logout() {
+    try {
+      await logoutRequest();
+    } catch {
+      // Session may already be invalidated.
+    }
+
     user.value = null;
+    isHydrated.value = true;
   }
 
   return {
     user,
+    isHydrated,
     isAuthenticated,
-    login,
+    hydrateSession,
     logout,
   };
 });
