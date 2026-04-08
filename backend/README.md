@@ -11,7 +11,7 @@ TypeScript + Express + Prisma + PostgreSQL 後端 API
 | 語言 | TypeScript |
 | ORM | Prisma 7 |
 | 資料庫 | PostgreSQL 16 |
-| 驗證 | jsonwebtoken + bcrypt |
+| 驗證 | Google OAuth + jsonwebtoken |
 | Schema 驗證 | Zod |
 | 測試 | Jest + supertest |
 
@@ -53,6 +53,9 @@ cp .env.example .env
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/self_management?schema=public"
 JWT_SECRET="your-very-secret-key-here"   # 請使用隨機長字串
+GOOGLE_CLIENT_ID="your-google-client-id"
+GOOGLE_CLIENT_SECRET="your-google-client-secret"
+GOOGLE_CALLBACK_URL="http://localhost:8080/auth/google/callback"
 PORT=8080
 NODE_ENV=development
 ```
@@ -135,33 +138,37 @@ GET /health
 
 ### Auth
 
-#### 註冊
+本專案僅支援 Google OAuth 登入，不提供傳統註冊/密碼登入。
+
+#### Google 登入入口
 
 ```
-POST /auth/register
-Content-Type: application/json
+GET /auth/google
+```
 
+呼叫後會 redirect 到 Google Consent Page。
+
+#### Google Callback
+
+```
+GET /auth/google/callback?code=<google_auth_code>
+```
+
+成功回傳 `200`，`data` 內容如下：
+
+```json
 {
-  "email": "user@example.com",
-  "password": "password123"
+  "token": "<jwt>",
+  "user": {
+    "id": 1,
+    "email": "user@example.com",
+    "name": "Your Name",
+    "createdAt": "2026-04-07T00:00:00.000Z"
+  }
 }
 ```
 
-回傳 `201`，`data` 包含 user 資訊（不含密碼）。
-
-#### 登入
-
-```
-POST /auth/login
-Content-Type: application/json
-
-{
-  "email": "user@example.com",
-  "password": "password123"
-}
-```
-
-回傳 `200`，`data.token` 為 JWT token（有效期 7 天）。
+失敗時會以統一格式回傳錯誤，例如 `GOOGLE_TOKEN_EXCHANGE_FAILED`。
 
 ---
 

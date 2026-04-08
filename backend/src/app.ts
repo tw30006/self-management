@@ -7,6 +7,7 @@ dotenv.config();
 
 import express from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import helmet from "helmet";
 
 import authRoutes from "./routes/auth";
@@ -26,11 +27,15 @@ app.use(
     origin: process.env.CORS_ORIGIN ?? "http://localhost:5173",
     methods: ["GET", "POST", "PATCH", "DELETE"],
     allowedHeaders: ["Content-Type", "Authorization"],
+    credentials: true,
   }),
 );
 
 // ── Body 解析 ──────────────────────────────────────────
 app.use(express.json());
+
+// 讀寫 cookie（用於把 JWT 放到 httpOnly cookie）
+app.use(cookieParser());
 
 // ── Health check（監控系統用）────────────────────────
 app.get("/health", (_req, res) => {

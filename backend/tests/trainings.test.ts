@@ -1,32 +1,37 @@
+/// <reference types="jest" />
 // tests/trainings.test.ts
 // Training CRUD API 整合測試
-// 每個測試案例都需要有效的 JWT token（先呼叫 login 取得）
+// 每個測試案例都需要有效的 JWT token
 
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/db/prisma";
 
 const TEST_EMAIL = "test.training@example.com";
-const TEST_PASSWORD = "password123";
+const TEST_GOOGLE_ID = "google-training-user";
 
 let authToken: string;
 let userId: number;
 
-// 測試前：建立測試使用者並取得 token
+// 測試前：建立測試使用者並簽發 token
 beforeAll(async () => {
   await prisma.user.deleteMany({ where: { email: TEST_EMAIL } });
 
-  // 註冊
-  const registerRes = await request(app)
-    .post("/auth/register")
-    .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
-  userId = registerRes.body.data.id;
+  const user = await prisma.user.create({
+    data: {
+      email: TEST_EMAIL,
+      googleId: TEST_GOOGLE_ID,
+      name: "Training Tester",
+    },
+  });
 
-  // 登入取得 token
-  const loginRes = await request(app)
-    .post("/auth/login")
-    .send({ email: TEST_EMAIL, password: TEST_PASSWORD });
-  authToken = loginRes.body.data.token;
+  userId = user.id;
+  authToken = jwt.sign(
+    { userId },
+    process.env.JWT_SECRET ?? "test-secret-key-for-jest",
+    { expiresIn: "7d" },
+  );
 });
 
 // 測試後清除資料並斷線

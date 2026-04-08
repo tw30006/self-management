@@ -1,62 +1,99 @@
 // src/services/authService.ts
-// Service 層：負責業務邏輯與資料庫操作
-// 重要原則：這裡不碰 req/res，只處理資料並回傳結果或拋出錯誤
-//
-// 為什麼要分 service 層？
-// - Controller 只負責「接收請求、呼叫 service、回傳結果」
-// - Service 才負責「做事」，這樣 controller 很薄、邏輯集中好測試
+// Google OAuth service：建立授權 URL、交換 code、取得 profile、簽發 JWT
 
-import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { prisma } from "../db/prisma";
 import { HttpError } from "../utils/httpError";
-import type { RegisterInput, LoginInput } from "../models/auth";
 
-const BCRYPT_ROUNDS = 12; // 越高越安全但越慢，12 是一般建議值
+type GoogleTokenResponse = {
+  access_token?: string;
+  id_token?: string;
+  token_type?: string;
+};
 
-// 註冊新使用者
-export async function registerUser(input: RegisterInput) {
-  // 1. 檢查 email 是否已被使用（避免 409 Conflict）
-  const existing = await prisma.user.findUnique({
-    where: { email: input.email },
-  });
-  if (existing) {
-    throw new HttpError(409, "此 email 已被註冊", "EMAIL_CONFLICT");
+type GoogleProfileResponse = {
+  sub?: string;
+  email?: string;
+  name?: string;
+};
+
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value) {
+    throw new HttpError(500, `Missing required env: ${name}`, "CONFIG_ERROR");
   }
-
-  // 2. 用 bcrypt 雜湊密碼（絕不儲存明文）
-  const hashedPassword = await bcrypt.hash(input.password, BCRYPT_ROUNDS);
-
-  // 3. 建立使用者
-  const user = await prisma.user.create({
-    data: { email: input.email, password: hashedPassword },
-    select: { id: true, email: true, createdAt: true }, // 不回傳 password hash
-  });
-
-  return user;
+  return value;
 }
 
-// 使用者登入，成功回傳 JWT token
-export async function loginUser(input: LoginInput) {
-  const secret = process.env.JWT_SECRET;
-  if (!secret)
-    throw new HttpError(500, "Server configuration error", "CONFIG_ERROR");
+export function buildGoogleOAuthUrl(): string {
+  const clientId = requireEnv("GOOGLE_CLIENT_ID");
+  const callbackUrl = requireEnv("GOOGLE_CALLBACK_URL");
 
-  // 1. 查找使用者
-  const user = await prisma.user.findUnique({ where: { email: input.email } });
+  const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+  url.searchParams.set("client_id", clientId);
+  url.searchParams.set("redirect_uri", callbackUrl);
+  url.searchParams.set("response_type", "code");
+  url.searchParams.set("scope", "openid email profile");
+  url.searchParams.set("access_type", "offline");
+  url.searchParams.set("prompt", "consent");
+  return url.toString();
+}
 
-  // 2. 驗證密碼（即使找不到 user 也要執行 compare，避免 timing attack）
-  const valid = user
-    ? await bcrypt.compare(input.password, user.password)
-    : false;
+export async function loginWithGoogleCode(code: string) {
+  const clientId = requireEnv("GOOGLE_CLIENT_ID");
+  const clientSecret = requireEnv("GOOGLE_CLIENT_SECRET");
+  const callbackUrl = requireEnv("GOOGLE_CALLBACK_URL");
+  const jwtSecret = requireEnv("JWT_SECRET");
 
-  if (!user || !valid) {
-    // 故意用模糊訊息，不讓攻擊者知道是 email 還是密碼錯
-    throw new HttpError(401, "email 或密碼不正確", "INVALID_CREDENTIALS");
+  const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      code,
+      client_id: clientId,
+      client_secret: clientSecret,
+      redirect_uri: callbackUrl,
+      grant_type: "authorization_code",
+    }),
+  });
+
+  if (!tokenRes.ok) {
+    throw new HttpError(401, "Google token exchange failed", "GOOGLE_TOKEN_EXCHANGE_FAILED");
   }
 
-  // 3. 簽發 JWT，payload 只存 userId（最小權限原則）
-  const token = jwt.sign({ userId: user.id }, secret, { expiresIn: "7d" });
+  const tokenJson = (await tokenRes.json()) as GoogleTokenResponse;
+  if (!tokenJson.access_token) {
+    throw new HttpError(401, "Google token payload invalid", "GOOGLE_TOKEN_INVALID");
+  }
 
-  return { token, user: { id: user.id, email: user.email } };
+  const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+    headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+  });
+
+  if (!profileRes.ok) {
+    throw new HttpError(401, "Google profile fetch failed", "GOOGLE_PROFILE_FETCH_FAILED");
+  }
+
+  const profile = (await profileRes.json()) as GoogleProfileResponse;
+  if (!profile.sub || !profile.email) {
+    throw new HttpError(401, "Google profile payload invalid", "GOOGLE_PROFILE_INVALID");
+  }
+
+  const user = await prisma.user.upsert({
+    where: { email: profile.email },
+    update: {
+      googleId: profile.sub,
+      name: profile.name ?? null,
+    },
+    create: {
+      email: profile.email,
+      googleId: profile.sub,
+      name: profile.name ?? null,
+    },
+    select: { id: true, email: true, name: true, createdAt: true },
+  });
+
+  const token = jwt.sign({ userId: user.id }, jwtSecret, { expiresIn: "7d" });
+
+  return { token, user };
 }

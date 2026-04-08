@@ -137,7 +137,7 @@ description: 依序執行 Google OAuth 登入 API 實作（後端）
 
 - 新開發者可依 README 完成本機登入流程。
 
-## 建議執行順序（不可跳步）
+## 執行順序（不可跳步）
 
 1. Step 0
 2. Step 1

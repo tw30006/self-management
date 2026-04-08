@@ -3,16 +3,26 @@
 // 職責分明：route 檔不寫邏輯，邏輯在 controller 與 service
 
 import { Router } from "express";
-import { register, login } from "../controllers/authController";
-import { validate } from "../middlewares/validate";
-import { registerSchema, loginSchema } from "../models/auth";
+import {
+  googleAuth,
+  googleAuthCallback,
+  getMe,
+  logout,
+} from "../controllers/authController";
+import { authenticate } from "../middlewares/authenticate";
 
 const router = Router();
 
-// POST /auth/register — 先驗證 body，再進 controller
-router.post("/register", validate(registerSchema), register);
+// GET /auth/google — 導向 Google OAuth 同意頁
+router.get("/google", googleAuth);
 
-// POST /auth/login
-router.post("/login", validate(loginSchema), login);
+// GET /auth/google/callback — Google 回調
+router.get("/google/callback", googleAuthCallback);
+
+// GET /auth/me — 取得目前使用者（cookie 或 header 驗證）
+router.get("/me", authenticate, getMe);
+
+// POST /auth/logout — 清除 cookie
+router.post("/logout", logout);
 
 export default router;

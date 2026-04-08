@@ -19,3 +19,16 @@ if (!process.env.JWT_SECRET) {
 if (!process.env.NODE_ENV) {
   process.env.NODE_ENV = "test";
 }
+
+if (!process.env.GOOGLE_CLIENT_ID) {
+  process.env.GOOGLE_CLIENT_ID = "test-google-client-id";
+}
+
+if (!process.env.GOOGLE_CLIENT_SECRET) {
+  process.env.GOOGLE_CLIENT_SECRET = "test-google-client-secret";
+}
+
+if (!process.env.GOOGLE_CALLBACK_URL) {
+  process.env.GOOGLE_CALLBACK_URL =
+    "http://localhost:8080/auth/google/callback";
+}

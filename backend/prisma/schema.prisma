@@ -14,7 +14,8 @@ datasource db {
 model User {
   id        Int        @id @default(autoincrement())
   email     String     @unique
-  password  String     // 儲存 bcrypt hash，絕不存明文
+  name      String?
+  googleId  String?    @unique @map("google_id")
   createdAt DateTime   @default(now()) @map("created_at")
   trainings Training[]
 

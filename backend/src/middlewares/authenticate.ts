@@ -24,24 +24,24 @@ declare global {
 export function authenticate(req: Request, _res: Response, next: NextFunction) {
   const authHeader = req.headers.authorization;
 
-  if (!authHeader?.startsWith("Bearer ")) {
+  // 支援從 Authorization header 或 httpOnly cookie 讀取 token
+  let token: string | undefined;
+  if (authHeader?.startsWith("Bearer ")) {
+    token = authHeader.slice(7);
+  } else if ((req as any).cookies && (req as any).cookies.token) {
+    token = (req as any).cookies.token;
+  }
+
+  if (!token) {
     return next(
-      new HttpError(
-        401,
-        "Missing or invalid Authorization header",
-        "UNAUTHORIZED",
-      ),
+      new HttpError(401, "Missing or invalid Authorization header", "UNAUTHORIZED"),
     );
   }
 
-  const token = authHeader.slice(7); // 去掉 "Bearer " 前綴
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
-    // JWT_SECRET 未設定屬於設定錯誤，不應在 production 發生
-    return next(
-      new HttpError(500, "Server configuration error", "CONFIG_ERROR"),
-    );
+    return next(new HttpError(500, "Server configuration error", "CONFIG_ERROR"));
   }
 
   try {
