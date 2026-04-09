@@ -9,6 +9,10 @@ import * as authService from "../services/authService";
 import { prisma } from "../db/prisma";
 import { HttpError } from "../utils/httpError";
 import {
+  OAUTH_STATE_COOKIE_NAME,
+  OAUTH_STATE_COOKIE_TTL_MS,
+} from "../utils/authConstants";
+import {
   googleCallbackQuerySchema,
   type GoogleCallbackQuery,
 } from "../models/auth";
@@ -23,11 +27,11 @@ export async function googleAuth(
     const state = randomBytes(16).toString("hex");
 
     // 以短效 httpOnly cookie 暫存 state，callback 時比對以防 CSRF
-    res.cookie("oauth_state", state, {
+    res.cookie(OAUTH_STATE_COOKIE_NAME, state, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
-      maxAge: 5 * 60 * 1000, // 5 minutes
+      maxAge: OAUTH_STATE_COOKIE_TTL_MS,
     });
 
     const url = authService.buildGoogleOAuthUrl(state);
@@ -48,9 +52,10 @@ export async function googleAuthCallback(
       req.query,
     ) as GoogleCallbackQuery;
 
-    const requestState =
-      typeof req.query.state === "string" ? req.query.state : "";
-    const cookieState = req.cookies?.oauth_state as string | undefined;
+    const requestState = query.state;
+    const cookieState = req.cookies?.[OAUTH_STATE_COOKIE_NAME] as
+      | string
+      | undefined;
 
     if (!requestState || !cookieState || requestState !== cookieState) {
       return next(
@@ -58,7 +63,7 @@ export async function googleAuthCallback(
       );
     }
 
-    res.clearCookie("oauth_state", {
+    res.clearCookie(OAUTH_STATE_COOKIE_NAME, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
@@ -105,13 +110,11 @@ export async function getMe(req: Request, res: Response, next: NextFunction) {
     });
 
     if (!user) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          data: null,
-          error: { code: "USER_NOT_FOUND", message: "User not found" },
-        });
+      return res.status(404).json({
+        success: false,
+        data: null,
+        error: { code: "USER_NOT_FOUND", message: "User not found" },
+      });
     }
 
     res.json({ success: true, data: user, error: null });

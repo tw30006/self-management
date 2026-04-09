@@ -6,6 +6,7 @@ import { jest } from "@jest/globals";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/db/prisma";
+import { OAUTH_STATE_COOKIE_NAME } from "../src/utils/authConstants";
 
 const TEST_EMAIL = "test.auth@example.com";
 const TEST_GOOGLE_ID = "google-sub-123";
@@ -36,7 +37,9 @@ describe("GET /auth/google", () => {
       "https://accounts.google.com/o/oauth2/v2/auth",
     );
     expect(res.headers.location).toContain("state=");
-    expect(res.headers["set-cookie"]?.[0]).toContain("oauth_state=");
+    expect(res.headers["set-cookie"]?.[0]).toContain(
+      `${OAUTH_STATE_COOKIE_NAME}=`,
+    );
   });
 });
 
@@ -52,7 +55,7 @@ describe("GET /auth/google/callback", () => {
         ? [rawSetCookie]
         : [];
     const stateCookie = cookies.find((cookie) =>
-      cookie.startsWith("oauth_state="),
+      cookie.startsWith(`${OAUTH_STATE_COOKIE_NAME}=`),
     );
 
     return { state, stateCookie };
