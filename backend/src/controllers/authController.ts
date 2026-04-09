@@ -4,8 +4,10 @@
 // try/catch + next(err) 是固定模式，讓 errorHandler middleware 統一處理
 
 import { Request, Response, NextFunction } from "express";
+import { randomBytes } from "crypto";
 import * as authService from "../services/authService";
 import { prisma } from "../db/prisma";
+import { HttpError } from "../utils/httpError";
 import {
   googleCallbackQuerySchema,
   type GoogleCallbackQuery,
@@ -18,7 +20,17 @@ export async function googleAuth(
   next: NextFunction,
 ) {
   try {
-    const url = authService.buildGoogleOAuthUrl();
+    const state = randomBytes(16).toString("hex");
+
+    // 以短效 httpOnly cookie 暫存 state，callback 時比對以防 CSRF
+    res.cookie("oauth_state", state, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+      maxAge: 5 * 60 * 1000, // 5 minutes
+    });
+
+    const url = authService.buildGoogleOAuthUrl(state);
     res.redirect(url);
   } catch (err) {
     next(err);
@@ -35,6 +47,23 @@ export async function googleAuthCallback(
     const query = googleCallbackQuerySchema.parse(
       req.query,
     ) as GoogleCallbackQuery;
+
+    const requestState =
+      typeof req.query.state === "string" ? req.query.state : "";
+    const cookieState = req.cookies?.oauth_state as string | undefined;
+
+    if (!requestState || !cookieState || requestState !== cookieState) {
+      return next(
+        new HttpError(400, "Invalid OAuth state", "INVALID_OAUTH_STATE"),
+      );
+    }
+
+    res.clearCookie("oauth_state", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "lax",
+    });
+
     const result = await authService.loginWithGoogleCode(query.code);
     // 將 JWT 以 httpOnly cookie 存回，前端改以 cookie 方式存取（更安全）
     // 在測試環境保留 JSON 回傳以維持現有測試行為

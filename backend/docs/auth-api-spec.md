@@ -45,8 +45,8 @@
 ## 4. 登入流程規格
 ### 4.1 流程總覽
 1. 前端導向 `GET /auth/google`。
-2. 後端組出 Google OAuth URL 並回傳 302 Redirect。
-3. 使用者在 Google 完成同意後，Google 轉址到 `GET /auth/google/callback?code=...`。
+2. 後端產生隨機 `state`，存入短效 httpOnly cookie（`oauth_state`），再組出 Google OAuth URL 並回傳 302 Redirect。
+3. 使用者在 Google 完成同意後，Google 轉址到 `GET /auth/google/callback?code=...&state=...`。
 4. 後端以 code 向 Google 換取 access token。
 5. 後端用 access token 取得 Google user profile。
 6. 後端以 email 做 upsert（更新或建立）使用者資料。
@@ -68,6 +68,12 @@
 2. 使用 `JWT_SECRET` 驗證 JWT。
 3. 驗證成功後將 `userId` 注入 `req.user.userId`。
 4. 驗證失敗回傳 401（`UNAUTHORIZED` 或 `INVALID_TOKEN`）。
+
+### 4.4 OAuth callback state 驗證流程（防 CSRF）
+1. `GET /auth/google` 產生隨機 `state`，存入 cookie `oauth_state`（短效）。
+2. 導向 Google 時，將 `state` 作為 query param 傳出。
+3. callback 時比對 `req.query.state` 與 `req.cookies.oauth_state`。
+4. 比對失敗回傳 `400 INVALID_OAUTH_STATE`，成功則清除 `oauth_state` cookie 並繼續 code exchange。
 
 ## 5. 資料模型與欄位
 ## 5.1 User（Prisma: users）
@@ -121,6 +127,7 @@
 
 - Error Response（常見）
   - `400 VALIDATION_ERROR`：缺少 code 或格式不合法
+  - `400 INVALID_OAUTH_STATE`：callback state 驗證失敗
   - `401 GOOGLE_TOKEN_EXCHANGE_FAILED`：向 Google 換 token 失敗
   - `401 GOOGLE_TOKEN_INVALID`：Google token payload 無效
   - `401 GOOGLE_PROFILE_FETCH_FAILED`：Google profile 取得失敗

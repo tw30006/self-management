@@ -35,51 +35,119 @@ describe("GET /auth/google", () => {
     expect(res.headers.location).toContain(
       "https://accounts.google.com/o/oauth2/v2/auth",
     );
+    expect(res.headers.location).toContain("state=");
+    expect(res.headers["set-cookie"]?.[0]).toContain("oauth_state=");
   });
 });
 
 describe("GET /auth/google/callback", () => {
+  async function getOAuthState() {
+    const authRes = await request(app).get("/auth/google");
+    const location = String(authRes.headers.location ?? "");
+    const state = new URL(location).searchParams.get("state");
+    const rawSetCookie = authRes.headers["set-cookie"];
+    const cookies = Array.isArray(rawSetCookie)
+      ? rawSetCookie
+      : rawSetCookie
+        ? [rawSetCookie]
+        : [];
+    const stateCookie = cookies.find((cookie) =>
+      cookie.startsWith("oauth_state="),
+    );
+
+    return { state, stateCookie };
+  }
+
   it("缺少 code 時回傳 400", async () => {
+    const { state, stateCookie } = await getOAuthState();
     const res = await request(app).get("/auth/google/callback");
+    const req = request(app).get(`/auth/google/callback?state=${state ?? ""}`);
+
+    if (stateCookie) {
+      req.set("Cookie", stateCookie);
+    }
+
+    const withStateRes = await req;
 
     expect(res.status).toBe(400);
     expect(res.body.success).toBe(false);
     expect(res.body.error.code).toBe("VALIDATION_ERROR");
+    expect(withStateRes.status).toBe(400);
+    expect(withStateRes.body.error.code).toBe("VALIDATION_ERROR");
+  });
+
+  it("state 不一致時回傳 400", async () => {
+    const { stateCookie } = await getOAuthState();
+    const req = request(app).get(
+      "/auth/google/callback?code=good-code&state=bad-state",
+    );
+
+    if (stateCookie) {
+      req.set("Cookie", stateCookie);
+    }
+
+    const res = await req;
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("INVALID_OAUTH_STATE");
   });
 
   it("Google token 交換失敗時回傳 401", async () => {
+    const { state, stateCookie } = await getOAuthState();
     fetchMock.mockResolvedValueOnce({ ok: false } as unknown as Response);
 
-    const res = await request(app).get("/auth/google/callback?code=bad-code");
+    const req = request(app).get(
+      `/auth/google/callback?code=bad-code&state=${state ?? ""}`,
+    );
+    if (stateCookie) {
+      req.set("Cookie", stateCookie);
+    }
+
+    const res = await req;
 
     expect(res.status).toBe(401);
     expect(res.body.error.code).toBe("GOOGLE_TOKEN_EXCHANGE_FAILED");
   });
 
   it("callback 成功時回傳 JWT 與使用者資料", async () => {
-    fetchMock
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({ access_token: "google-access-token" }),
-      } as unknown as Response)
-      .mockResolvedValueOnce({
-        ok: true,
-        json: async () => ({
-          sub: TEST_GOOGLE_ID,
-          email: TEST_EMAIL,
-          name: "OAuth Tester",
-        }),
-      } as unknown as Response);
+    const { state, stateCookie } = await getOAuthState();
+    const previousNodeEnv = process.env.NODE_ENV;
+    process.env.NODE_ENV = "test";
 
-    const res = await request(app).get("/auth/google/callback?code=good-code");
+    try {
+      fetchMock
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({ access_token: "google-access-token" }),
+        } as unknown as Response)
+        .mockResolvedValueOnce({
+          ok: true,
+          json: async () => ({
+            sub: TEST_GOOGLE_ID,
+            email: TEST_EMAIL,
+            name: "OAuth Tester",
+          }),
+        } as unknown as Response);
 
-    expect(res.status).toBe(200);
-    expect(res.body.success).toBe(true);
-    expect(typeof res.body.data.token).toBe("string");
-    expect(res.body.data.user.email).toBe(TEST_EMAIL);
+      const req = request(app).get(
+        `/auth/google/callback?code=good-code&state=${state ?? ""}`,
+      );
+      if (stateCookie) {
+        req.set("Cookie", stateCookie);
+      }
 
-    const user = await prisma.user.findUnique({ where: { email: TEST_EMAIL } });
-    expect(user).not.toBeNull();
-    expect(user?.googleId).toBe(TEST_GOOGLE_ID);
+      const res = await req;
+
+      expect(res.status).toBe(200);
+      expect(res.body.success).toBe(true);
+      expect(typeof res.body.data.token).toBe("string");
+      expect(res.body.data.user.email).toBe(TEST_EMAIL);
+
+      const user = await prisma.user.findUnique({ where: { email: TEST_EMAIL } });
+      expect(user).not.toBeNull();
+      expect(user?.googleId).toBe(TEST_GOOGLE_ID);
+    } finally {
+      process.env.NODE_ENV = previousNodeEnv;
+    }
   });
 });

@@ -25,7 +25,7 @@ function requireEnv(name: string): string {
   return value;
 }
 
-export function buildGoogleOAuthUrl(): string {
+export function buildGoogleOAuthUrl(state: string): string {
   const clientId = requireEnv("GOOGLE_CLIENT_ID");
   const callbackUrl = requireEnv("GOOGLE_CALLBACK_URL");
 
@@ -33,6 +33,7 @@ export function buildGoogleOAuthUrl(): string {
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", callbackUrl);
   url.searchParams.set("response_type", "code");
+  url.searchParams.set("state", state);
   url.searchParams.set("scope", "openid email profile");
   url.searchParams.set("access_type", "offline");
   url.searchParams.set("prompt", "consent");
@@ -58,25 +59,44 @@ export async function loginWithGoogleCode(code: string) {
   });
 
   if (!tokenRes.ok) {
-    throw new HttpError(401, "Google token exchange failed", "GOOGLE_TOKEN_EXCHANGE_FAILED");
+    throw new HttpError(
+      401,
+      "Google token exchange failed",
+      "GOOGLE_TOKEN_EXCHANGE_FAILED",
+    );
   }
 
   const tokenJson = (await tokenRes.json()) as GoogleTokenResponse;
   if (!tokenJson.access_token) {
-    throw new HttpError(401, "Google token payload invalid", "GOOGLE_TOKEN_INVALID");
+    throw new HttpError(
+      401,
+      "Google token payload invalid",
+      "GOOGLE_TOKEN_INVALID",
+    );
   }
 
-  const profileRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
-    headers: { Authorization: `Bearer ${tokenJson.access_token}` },
-  });
+  const profileRes = await fetch(
+    "https://www.googleapis.com/oauth2/v3/userinfo",
+    {
+      headers: { Authorization: `Bearer ${tokenJson.access_token}` },
+    },
+  );
 
   if (!profileRes.ok) {
-    throw new HttpError(401, "Google profile fetch failed", "GOOGLE_PROFILE_FETCH_FAILED");
+    throw new HttpError(
+      401,
+      "Google profile fetch failed",
+      "GOOGLE_PROFILE_FETCH_FAILED",
+    );
   }
 
   const profile = (await profileRes.json()) as GoogleProfileResponse;
   if (!profile.sub || !profile.email) {
-    throw new HttpError(401, "Google profile payload invalid", "GOOGLE_PROFILE_INVALID");
+    throw new HttpError(
+      401,
+      "Google profile payload invalid",
+      "GOOGLE_PROFILE_INVALID",
+    );
   }
 
   const user = await prisma.user.upsert({

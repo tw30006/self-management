@@ -76,22 +76,35 @@ export async function updateTraining(
   trainingId: number,
   input: UpdateTrainingInput,
 ) {
-  // 先確認存在且屬於該使用者
-  await getTraining(userId, trainingId);
+  // 建立要更新的 data 物件（只包含有提供的欄位）
+  const data: any = {
+    ...(input.performed_at !== undefined && {
+      performedAt: new Date(input.performed_at),
+    }),
+    ...(input.action_name !== undefined && { actionName: input.action_name }),
+    ...(input.sets !== undefined && { sets: input.sets }),
+    ...(input.reps !== undefined && { reps: input.reps }),
+    ...(input.weight !== undefined && {
+      weight: new Prisma.Decimal(String(input.weight)),
+    }),
+    ...(input.heart_rate !== undefined && { heartRate: input.heart_rate }),
+    ...(input.notes !== undefined && { notes: input.notes }),
+  };
 
-  const training = await prisma.training.update({
+  // 使用 updateMany 在單一 SQL UPDATE 中同時檢查 id 與 userId（atomic）
+  const result = await prisma.training.updateMany({
+    where: { id: trainingId, userId },
+    data,
+  });
+
+  // 如果沒有任何列被更新，表示不存在或不屬於該使用者
+  if (result.count === 0) {
+    throw new HttpError(404, "找不到此訓練紀錄", "TRAINING_NOT_FOUND");
+  }
+
+  // updateMany 不會回傳更新後的資料，若需要回傳則再查一次（屬於同一筆且剛剛已被更新）
+  const training = await prisma.training.findUnique({
     where: { id: trainingId },
-    data: {
-      ...(input.performed_at && { performedAt: new Date(input.performed_at) }),
-      ...(input.action_name && { actionName: input.action_name }),
-      ...(input.sets !== undefined && { sets: input.sets }),
-      ...(input.reps !== undefined && { reps: input.reps }),
-      ...(input.weight !== undefined && {
-        weight: new Prisma.Decimal(String(input.weight)),
-      }),
-      ...(input.heart_rate !== undefined && { heartRate: input.heart_rate }),
-      ...(input.notes !== undefined && { notes: input.notes }),
-    },
   });
 
   return training;
