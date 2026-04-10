@@ -9,6 +9,11 @@
           <RouterLink class="text-slate-600 hover:text-slate-900" to="/"
             >Home</RouterLink
           >
+          <RouterLink
+            class="text-slate-600 hover:text-slate-900"
+            to="/trainings/new"
+            >New Training</RouterLink
+          >
         </nav>
       </div>
     </header>

@@ -12,6 +12,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/trainings/new",
+      name: "training-create",
+      component: () => import("../views/TrainingCreateView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/login",
       name: "login",
       component: () => import("../views/Login.vue"),
