@@ -1,4 +1,4 @@
-import { apiPost } from "./http";
+import { apiGet, apiPost } from "./http";
 
 export interface CreateTrainingPayload {
   performed_at: string;
@@ -24,6 +24,26 @@ export interface TrainingRecord {
   updatedAt: string;
 }
 
+export interface TrainingsPaginationMeta {
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface TrainingsPage {
+  trainings: TrainingRecord[];
+  meta: TrainingsPaginationMeta;
+}
+
 export function createTraining(payload: CreateTrainingPayload) {
   return apiPost<TrainingRecord>("/trainings", payload);
+}
+
+export function getTrainings(page = 1, limit = 20) {
+  const query = new URLSearchParams({
+    page: String(page),
+    limit: String(limit),
+  });
+
+  return apiGet<TrainingsPage>(`/trainings?${query.toString()}`);
 }
