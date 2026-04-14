@@ -7,12 +7,16 @@ COPY package*.json ./
 # Lock npm to a stable version and install deps.
 RUN corepack enable \
   && corepack prepare npm@9.8.1 --activate \
-  && npm install
+  && npm ci --include=dev
 
 COPY . ./
 
-RUN npx prisma generate
+RUN npx prisma generate \
+  && npm run build \
+  && npm prune --omit=dev
+
+ENV NODE_ENV=production
 
 EXPOSE 8080
 
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "start:zeabur"]
