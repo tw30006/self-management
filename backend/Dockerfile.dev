@@ -4,7 +4,10 @@ WORKDIR /app
 
 COPY package*.json ./
 
-RUN npm install
+# 確保使用穩定的 npm 版本（避免在 CI 或主機上執行全域 `npm update -g npm` 導致的缺失）
+RUN corepack enable \
+	&& corepack prepare npm@9.8.1 --activate \
+	&& npm install
 
 COPY . .
 
