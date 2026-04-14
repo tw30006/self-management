@@ -17,6 +17,19 @@ import {
   type GoogleCallbackQuery,
 } from "../models/auth";
 
+function getSessionCookieOptions() {
+  // 簡化邏輯：生產環境使用跨站 cookie (SameSite=None + Secure)，
+  // 開發環境使用 SameSite=lax 以利本地測試。
+  const isProduction = process.env.NODE_ENV === "production";
+
+  return {
+    httpOnly: true,
+    secure: isProduction,
+    sameSite: (isProduction ? "none" : "lax") as "none" | "lax",
+    path: "/",
+  };
+}
+
 // GET /auth/google
 export async function googleAuth(
   _req: Request,
@@ -78,9 +91,7 @@ export async function googleAuthCallback(
       "http://localhost:5173";
 
     res.cookie("token", result.token, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === "production",
-      sameSite: "lax",
+      ...getSessionCookieOptions(),
       maxAge: 7 * 24 * 60 * 60 * 1000, // 7 days
     });
 
@@ -125,6 +136,6 @@ export async function getMe(req: Request, res: Response, next: NextFunction) {
 
 // POST /auth/logout — 清除 token cookie
 export async function logout(_req: Request, res: Response) {
-  res.clearCookie("token", { httpOnly: true, sameSite: "lax" });
+  res.clearCookie("token", getSessionCookieOptions());
   res.json({ success: true, data: null, error: null });
 }
