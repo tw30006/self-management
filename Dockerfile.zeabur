@@ -1,0 +1,16 @@
+FROM node:20-alpine
+
+WORKDIR /app
+
+# Build context is repository root, so backend files are copied via backend/ prefix.
+COPY backend/package*.json ./
+
+RUN npm install
+
+COPY backend/ ./
+
+RUN npx prisma generate
+
+EXPOSE 8080
+
+CMD ["npm", "run", "dev"]
