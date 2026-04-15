@@ -12,6 +12,26 @@ import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { HttpError } from "../utils/httpError";
 
+type JwtAuthPayload = {
+  userId?: unknown;
+  id?: unknown;
+};
+
+function toPositiveInt(value: unknown): number | null {
+  if (typeof value === "number" && Number.isInteger(value) && value > 0) {
+    return value;
+  }
+
+  if (typeof value === "string" && /^\d+$/.test(value)) {
+    const parsed = Number(value);
+    if (Number.isSafeInteger(parsed) && parsed > 0) {
+      return parsed;
+    }
+  }
+
+  return null;
+}
+
 // 擴充 Express 的 Request 型別，加入 user 欄位
 declare global {
   namespace Express {
@@ -34,19 +54,31 @@ export function authenticate(req: Request, _res: Response, next: NextFunction) {
 
   if (!token) {
     return next(
-      new HttpError(401, "Missing or invalid Authorization header", "UNAUTHORIZED"),
+      new HttpError(
+        401,
+        "Missing or invalid Authorization header",
+        "UNAUTHORIZED",
+      ),
     );
   }
 
   const secret = process.env.JWT_SECRET;
 
   if (!secret) {
-    return next(new HttpError(500, "Server configuration error", "CONFIG_ERROR"));
+    return next(
+      new HttpError(500, "Server configuration error", "CONFIG_ERROR"),
+    );
   }
 
   try {
-    const payload = jwt.verify(token, secret) as { userId: number };
-    req.user = { userId: payload.userId };
+    const payload = jwt.verify(token, secret) as JwtAuthPayload;
+    const normalizedUserId = toPositiveInt(payload.userId ?? payload.id);
+
+    if (!normalizedUserId) {
+      return next(new HttpError(401, "Invalid token payload", "INVALID_TOKEN"));
+    }
+
+    req.user = { userId: normalizedUserId };
     next();
   } catch {
     next(new HttpError(401, "Invalid or expired token", "INVALID_TOKEN"));

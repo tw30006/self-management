@@ -3,6 +3,7 @@
 import { jest } from "@jest/globals";
 // Auth API 整合測試（Google OAuth）
 
+import jwt from "jsonwebtoken";
 import request from "supertest";
 import app from "../src/app";
 import { prisma } from "../src/db/prisma";
@@ -10,6 +11,7 @@ import { OAUTH_STATE_COOKIE_NAME } from "../src/utils/authConstants";
 
 const TEST_EMAIL = "test.auth@example.com";
 const TEST_GOOGLE_ID = "google-sub-123";
+const TEST_ME_EMAIL = "test.auth.me@example.com";
 
 const fetchMock = jest.fn() as jest.MockedFunction<typeof fetch>;
 
@@ -21,10 +23,12 @@ beforeAll(() => {
 beforeEach(async () => {
   fetchMock.mockReset();
   await prisma.user.deleteMany({ where: { email: TEST_EMAIL } });
+  await prisma.user.deleteMany({ where: { email: TEST_ME_EMAIL } });
 });
 
 afterAll(async () => {
   await prisma.user.deleteMany({ where: { email: TEST_EMAIL } });
+  await prisma.user.deleteMany({ where: { email: TEST_ME_EMAIL } });
   await prisma.$disconnect();
 });
 
@@ -146,11 +150,55 @@ describe("GET /auth/google/callback", () => {
       expect(typeof res.body.data.token).toBe("string");
       expect(res.body.data.user.email).toBe(TEST_EMAIL);
 
-      const user = await prisma.user.findUnique({ where: { email: TEST_EMAIL } });
+      const user = await prisma.user.findUnique({
+        where: { email: TEST_EMAIL },
+      });
       expect(user).not.toBeNull();
       expect(user?.googleId).toBe(TEST_GOOGLE_ID);
     } finally {
       process.env.NODE_ENV = previousNodeEnv;
     }
+  });
+});
+
+describe("GET /auth/me", () => {
+  it("支援舊版 token payload 的 id 欄位", async () => {
+    const user = await prisma.user.create({
+      data: {
+        email: TEST_ME_EMAIL,
+        googleId: "google-sub-me-legacy",
+        name: "Legacy Token User",
+      },
+    });
+
+    const token = jwt.sign(
+      { id: user.id },
+      process.env.JWT_SECRET ?? "test-secret-key-for-jest",
+      { expiresIn: "7d" },
+    );
+
+    const res = await request(app)
+      .get("/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.id).toBe(user.id);
+  });
+
+  it("token payload userId 非數字時回傳 401（非 500）", async () => {
+    const token = jwt.sign(
+      { userId: "not-a-number" },
+      process.env.JWT_SECRET ?? "test-secret-key-for-jest",
+      { expiresIn: "7d" },
+    );
+
+    const res = await request(app)
+      .get("/auth/me")
+      .set("Authorization", `Bearer ${token}`);
+
+    expect(res.status).toBe(401);
+    expect(res.body.success).toBe(false);
+    expect(res.body.error.code).toBe("INVALID_TOKEN");
   });
 });

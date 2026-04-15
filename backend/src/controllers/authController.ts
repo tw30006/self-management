@@ -110,9 +110,21 @@ export async function googleAuthCallback(
 // GET /auth/me — 回傳目前使用者資訊（需 authenticate middleware）
 export async function getMe(req: Request, res: Response, next: NextFunction) {
   try {
+    // 避免瀏覽器或中間層快取 /auth/me，導致回 304 影響前端登入狀態判斷
+    res.setHeader("Cache-Control", "no-store, private");
+    res.setHeader("Pragma", "no-cache");
+    res.setHeader("Expires", "0");
+    res.setHeader("Vary", "Cookie");
+
     const userId = req.user?.userId;
-    if (!userId) {
-      return next(new Error("No authenticated user"));
+    if (!Number.isInteger(userId) || (userId as number) <= 0) {
+      return next(
+        new HttpError(
+          401,
+          "Missing or invalid authenticated user",
+          "UNAUTHORIZED",
+        ),
+      );
     }
 
     const user = await prisma.user.findUnique({

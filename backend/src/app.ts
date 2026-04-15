@@ -3,8 +3,24 @@
 // 好處：測試時可直接 import app，不需要實際啟動 server 監聽 port
 
 import dotenv from "dotenv";
-dotenv.config({ path: ".env" });
-dotenv.config({ path: ".env.local", override: true });
+
+function loadEnvFiles() {
+  const externallyProvidedEnv = new Map<string, string>();
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value === "string") {
+      externallyProvidedEnv.set(key, value);
+    }
+  }
+
+  dotenv.config({ path: ".env.local", override: true });
+
+  for (const [key, value] of externallyProvidedEnv.entries()) {
+    process.env[key] = value;
+  }
+}
+
+loadEnvFiles();
 
 import express from "express";
 import cors from "cors";

@@ -45,22 +45,22 @@ backend/
 ### 1. 設定環境變數
 
 ```bash
-cp .env.example .env
+cp .env.example .env.local
 ```
 
-編輯 `.env`，填入你的資料庫連線資訊：
+編輯 `.env.local`，填入你的資料庫連線資訊：
 
 ```env
 DATABASE_URL="postgresql://USER:PASSWORD@localhost:5432/self_management?schema=public"
 JWT_SECRET="your-very-secret-key-here"   # 請使用隨機長字串
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
-GOOGLE_CALLBACK_URL="http://localhost:8080/auth/google/callback"
+GOOGLE_CALLBACK_URL="http://localhost:8080/auth/callback"
 PORT=8080
 NODE_ENV=development
 ```
 
-> **安全提醒**：`.env` 已加入 `.gitignore`，請勿提交到版本控制。
+> **安全提醒**：`.env.local` 已加入 `.gitignore`，請勿提交到版本控制。
 
 ### 2. 安裝依賴
 
@@ -101,6 +101,13 @@ docker compose up --build db backend
 ```bash
 docker compose exec backend npx prisma migrate dev
 ```
+
+### Docker 與本機環境變數注意事項（重要）
+
+- 主機直接跑 backend（`npm run dev`）時，`DATABASE_URL` 應使用 `localhost`。
+- Docker 跑 backend 時，`DATABASE_URL` 應使用 `db`（由 Compose 注入），不可使用 `localhost`。
+- 本專案已在 `src/app.ts` 處理載入優先序，預設為：外部注入 > `.env.local`。
+- 如果 OAuth callback 出現 `prisma.user.upsert()` 的 `ECONNREFUSED`，優先檢查 backend 實際吃到的 `DATABASE_URL` host 是否為 `db`。
 
 ---
 
@@ -153,6 +160,8 @@ GET /auth/google
 ```
 GET /auth/google/callback?code=<google_auth_code>
 ```
+
+> 相容路徑：`GET /auth/callback` 也會導向同一段 callback handler。
 
 成功回傳 `200`，`data` 內容如下：
 
@@ -242,7 +251,7 @@ DELETE /trainings/:id
 測試使用真實資料庫（需要先設定 `.env.test`）：
 
 ```bash
-cp .env.example .env.test
+cp .env.test.example .env.test
 # 編輯 .env.test，建議使用獨立的測試資料庫
 ```
 

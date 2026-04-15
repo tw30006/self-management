@@ -3,10 +3,28 @@
 // 連線 URL 由環境變數 DATABASE_URL 提供，請參考 .env.example
 //
 // 注意：migrate 指令執行前請確保已設定 DATABASE_URL
-// 本機開發：在 .env 設定，Docker：透過 docker-compose.yml 注入
+// 本機開發：在 .env.local 設定，Docker：透過 docker-compose.yml 注入
 
-require("dotenv/config");
+const dotenv = require("dotenv");
 const { defineConfig } = require("prisma/config");
+
+function loadEnvFiles() {
+  const externallyProvidedEnv = new Map();
+
+  for (const [key, value] of Object.entries(process.env)) {
+    if (typeof value === "string") {
+      externallyProvidedEnv.set(key, value);
+    }
+  }
+
+  dotenv.config({ path: ".env.local", override: true });
+
+  for (const [key, value] of externallyProvidedEnv.entries()) {
+    process.env[key] = value;
+  }
+}
+
+loadEnvFiles();
 
 module.exports = defineConfig({
   schema: "prisma/schema.prisma",
