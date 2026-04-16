@@ -21,11 +21,14 @@ export class ApiRequestError extends Error {
   }
 }
 
-const API_BASE_URL =
-  import.meta.env.VITE_API_BASE_URL ?? "http://localhost:8080";
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 function buildApiUrl(path: string): string {
-  return new URL(path, API_BASE_URL).toString();
+  const base = API_BASE_URL.endsWith("/")
+    ? API_BASE_URL.slice(0, -1)
+    : API_BASE_URL;
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+
+  return `${base}${normalizedPath}`;
 }
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
