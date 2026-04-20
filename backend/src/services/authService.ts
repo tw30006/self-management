@@ -46,6 +46,8 @@ export async function loginWithGoogleCode(code: string) {
   const callbackUrl = requireEnv("GOOGLE_CALLBACK_URL");
   const jwtSecret = requireEnv("JWT_SECRET");
 
+  const ownerSub = requireEnv("GOOGLE_OWNER_SUB");
+
   const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
     method: "POST",
     headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -96,6 +98,14 @@ export async function loginWithGoogleCode(code: string) {
       401,
       "Google profile payload invalid",
       "GOOGLE_PROFILE_INVALID",
+    );
+  }
+
+  if (profile.sub !== ownerSub) {
+    throw new HttpError(
+      403,
+      "You are not allowed to login",
+      "AUTH_NOT_ALLOWED",
     );
   }
 
