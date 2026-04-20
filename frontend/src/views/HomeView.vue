@@ -80,13 +80,13 @@ onMounted(() => {
         class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
       >
         <h2 class="text-3xl font-semibold tracking-wide text-white">
-          TRAINING_LOG
+          訓練紀錄
         </h2>
         <RouterLink
           to="/trainings/new"
           class="inline-flex h-11 items-center justify-center rounded-md bg-[#7de8ef] px-4 text-sm font-semibold uppercase tracking-[0.12em] text-[#174452] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5ff]"
         >
-          + Initialize Record
+          新增
         </RouterLink>
       </div>
     </header>
