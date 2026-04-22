@@ -1,14 +1,19 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from "vue";
 import {
+  deleteTraining,
   getTrainings,
   type TrainingRecord,
   type TrainingsPaginationMeta,
 } from "../api/trainings";
+import DeleteConfirmModal from "../components/DeleteConfirmModal.vue";
 
 const trainings = ref<TrainingRecord[]>([]);
 const isLoading = ref(false);
+const isDeleting = ref(false);
 const errorMsg = ref("");
+const isDeleteModalOpen = ref(false);
+const trainingToDelete = ref<TrainingRecord | null>(null);
 const pagination = ref<TrainingsPaginationMeta>({
   total: 0,
   page: 1,
@@ -20,6 +25,13 @@ const totalPages = computed(() =>
 );
 const canGoPrev = computed(() => pagination.value.page > 1);
 const canGoNext = computed(() => pagination.value.page < totalPages.value);
+const deleteModalMessage = computed(() => {
+  if (!trainingToDelete.value) {
+    return "這筆資料刪除後無法復原，確定要繼續嗎？";
+  }
+
+  return `刪除「${trainingToDelete.value.actionName}」後將無法復原，確定要繼續嗎？`;
+});
 
 function formatTimestamp(iso: string) {
   const date = new Date(iso);
@@ -62,6 +74,40 @@ async function fetchTrainings(page = 1) {
     errorMsg.value = "讀取訓練紀錄失敗，請稍後再試。";
   } finally {
     isLoading.value = false;
+  }
+}
+
+function openDeleteModal(training: TrainingRecord) {
+  trainingToDelete.value = training;
+  isDeleteModalOpen.value = true;
+}
+
+function closeDeleteModal(force = false) {
+  if (isDeleting.value && !force) {
+    return;
+  }
+
+  isDeleteModalOpen.value = false;
+  trainingToDelete.value = null;
+}
+
+async function confirmDeleteTraining() {
+  if (!trainingToDelete.value || isDeleting.value) {
+    return;
+  }
+
+  isDeleting.value = true;
+
+  try {
+    const deletedId = trainingToDelete.value.id;
+    await deleteTraining(deletedId);
+    trainings.value = trainings.value.filter((t) => t.id !== deletedId);
+    pagination.value.total = Math.max(0, pagination.value.total - 1);
+    closeDeleteModal(true);
+  } catch {
+    alert("刪除失敗，請稍後再試一次");
+  } finally {
+    isDeleting.value = false;
   }
 }
 
@@ -155,6 +201,7 @@ onMounted(() => {
               aria-label="Delete"
               class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#FF716C] bg-transparent text-[#FF716C] transition hover:bg-[#FF716C]/10 focus-visible:outline-none focus-visible:ring-[#FF716C] cursor-pointer"
               type="button"
+              @click="openDeleteModal(training)"
             >
               <span class="material-symbols-outlined delete-icon">delete</span>
             </button>
@@ -229,6 +276,17 @@ onMounted(() => {
         </button>
       </nav>
     </div>
+
+    <DeleteConfirmModal
+      :open="isDeleteModalOpen"
+      title="刪除訓練紀錄"
+      :message="deleteModalMessage"
+      confirm-text="確認"
+      cancel-text="取消"
+      :is-processing="isDeleting"
+      @close="closeDeleteModal"
+      @confirm="confirmDeleteTraining"
+    />
   </section>
 </template>
 <style scoped>

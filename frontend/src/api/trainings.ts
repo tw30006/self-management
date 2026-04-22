@@ -1,4 +1,4 @@
-import { apiGet, apiPost, apiEdit } from "./http";
+import { apiGet, apiPost, apiEdit, apiDelete } from "./http";
 
 export interface CreateTrainingPayload {
   performed_at: string;
@@ -56,4 +56,8 @@ export function editTraining(
   payload: Partial<CreateTrainingPayload>,
 ) {
   return apiEdit<TrainingRecord>(`/trainings/${id}`, payload);
+}
+
+export function deleteTraining(id: number) {
+  return apiDelete<void>(`/trainings/${id}`);
 }

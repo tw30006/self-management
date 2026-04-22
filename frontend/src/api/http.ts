@@ -41,6 +41,10 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
     },
   });
 
+  if (response.status === 204 || response.status === 205) {
+    return undefined as T;
+  }
+
   const contentType = response.headers.get("content-type") ?? "";
   const payload = contentType.includes("application/json")
     ? ((await response.json()) as ApiEnvelope<T>)
@@ -90,6 +94,9 @@ export function apiEdit<T>(
     body: body === undefined ? undefined : JSON.stringify(body),
     ...init,
   });
+}
+export function apiDelete<T>(path: string, init?: RequestInit): Promise<T> {
+  return request<T>(path, { method: "DELETE", ...init });
 }
 
 export { API_BASE_URL, buildApiUrl };
