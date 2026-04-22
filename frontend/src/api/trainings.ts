@@ -1,4 +1,4 @@
-import { apiGet, apiPost } from "./http";
+import { apiGet, apiPost, apiEdit } from "./http";
 
 export interface CreateTrainingPayload {
   performed_at: string;
@@ -34,6 +34,9 @@ export interface TrainingsPage {
   trainings: TrainingRecord[];
   meta: TrainingsPaginationMeta;
 }
+export function getTraining(id: number) {
+  return apiGet<TrainingRecord>(`/trainings/${id}`);
+}
 
 export function createTraining(payload: CreateTrainingPayload) {
   return apiPost<TrainingRecord>("/trainings", payload);
@@ -46,4 +49,11 @@ export function getTrainings(page = 1, limit = 20) {
   });
 
   return apiGet<TrainingsPage>(`/trainings?${query.toString()}`);
+}
+
+export function editTraining(
+  id: number,
+  payload: Partial<CreateTrainingPayload>,
+) {
+  return apiEdit<TrainingRecord>(`/trainings/${id}`, payload);
 }

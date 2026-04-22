@@ -80,5 +80,16 @@ export function apiPost<T>(
     ...init,
   });
 }
+export function apiEdit<T>(
+  path: string,
+  body?: unknown,
+  init?: RequestInit,
+): Promise<T> {
+  return request<T>(path, {
+    method: "PATCH",
+    body: body === undefined ? undefined : JSON.stringify(body),
+    ...init,
+  });
+}
 
 export { API_BASE_URL, buildApiUrl };

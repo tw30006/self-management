@@ -1,6 +1,12 @@
 <script setup lang="ts">
-import { computed, reactive, ref } from "vue";
-import { createTraining, type CreateTrainingPayload } from "../api/trainings";
+import { computed, reactive, ref, onMounted } from "vue";
+import { useRoute, useRouter } from "vue-router";
+import {
+  createTraining,
+  editTraining,
+  getTraining,
+  type CreateTrainingPayload,
+} from "../api/trainings";
 import BaseInput from "../components/BaseInput.vue";
 
 interface TrainingFormState {
@@ -14,6 +20,16 @@ interface TrainingFormState {
 }
 
 type FormErrors = Partial<Record<keyof TrainingFormState, string>>;
+
+const FORM_KEYS = [
+  "performedAt",
+  "actionName",
+  "sets",
+  "reps",
+  "weight",
+  "heartRate",
+  "notes",
+] as const;
 
 const form = reactive<TrainingFormState>({
   performedAt: "",
@@ -29,8 +45,23 @@ const errors = reactive<FormErrors>({});
 const submitError = ref("");
 const submitSuccess = ref("");
 const isSubmitting = ref(false);
+const isLoadingTraining = ref(false);
+const route = useRoute();
+const router = useRouter();
 
-const hasAnyError = computed(() => Object.keys(errors).length > 0);
+const isEditMode = computed(() => route.name === "training-edit");
+const trainingId = computed(() => {
+  const rawId = route.params.id;
+  const normalized = Array.isArray(rawId)
+    ? rawId[0]
+    : typeof rawId === "string"
+      ? rawId
+      : "";
+  const parsed = Number(normalized);
+
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : null;
+});
+const hasAnyError = computed(() => FORM_KEYS.some((key) => !!errors[key]));
 
 function clearMessages() {
   submitError.value = "";
@@ -38,21 +69,18 @@ function clearMessages() {
 }
 
 function clearForm() {
-  form.performedAt = "";
-  form.actionName = "";
-  form.sets = "";
-  form.reps = "";
-  form.weight = "";
-  form.heartRate = "";
-  form.notes = "";
-  for (const key of Object.keys(errors) as Array<keyof TrainingFormState>) {
+  for (const key of FORM_KEYS) {
+    form[key] = "";
+  }
+
+  for (const key of FORM_KEYS) {
     delete errors[key];
   }
   clearMessages();
 }
 
 function validateForm(): boolean {
-  for (const key of Object.keys(errors) as Array<keyof TrainingFormState>) {
+  for (const key of FORM_KEYS) {
     delete errors[key];
   }
 
@@ -106,8 +134,12 @@ function toPayload(): CreateTrainingPayload {
   return payload;
 }
 
-async function submitForm() {
+async function handleSubmit() {
   clearMessages();
+
+  if (isLoadingTraining.value || isSubmitting.value) {
+    return;
+  }
 
   if (!validateForm()) {
     return;
@@ -115,15 +147,73 @@ async function submitForm() {
 
   isSubmitting.value = true;
   try {
+    if (isEditMode.value) {
+      if (trainingId.value === null) {
+        submitError.value = "無效的訓練紀錄 ID";
+        return;
+      }
+
+      await editTraining(trainingId.value, toPayload());
+      submitSuccess.value = "訓練紀錄已成功更新";
+      setTimeout(() => {
+        router.push({ name: "home" });
+      }, 1000);
+      return;
+    }
+
     await createTraining(toPayload());
     submitSuccess.value = "訓練紀錄已成功建立";
     clearForm();
   } catch {
-    submitError.value = "提交失敗，請稍後再試一次";
+    if (isEditMode.value) {
+      submitError.value = "更新失敗，請稍後再試一次";
+    } else {
+      submitError.value = "提交失敗，請稍後再試一次";
+    }
   } finally {
     isSubmitting.value = false;
   }
 }
+
+function toDateTimeLocal(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const tzOffset = date.getTimezoneOffset() * 60_000;
+  return new Date(date.getTime() - tzOffset).toISOString().slice(0, 16);
+}
+
+async function loadTraining(id: number) {
+  isLoadingTraining.value = true;
+  try {
+    const training = await getTraining(id);
+    form.performedAt = toDateTimeLocal(training.performedAt);
+    form.actionName = training.actionName;
+    form.sets = String(training.sets);
+    form.reps = String(training.reps);
+    form.weight = String(training.weight);
+    form.heartRate =
+      training.heartRate !== null ? String(training.heartRate) : "";
+    form.notes = training.notes ?? "";
+  } finally {
+    isLoadingTraining.value = false;
+  }
+}
+
+onMounted(() => {
+  if (isEditMode.value && trainingId.value !== null) {
+    loadTraining(trainingId.value).catch(() => {
+      submitError.value = "讀取訓練紀錄失敗，請稍後再試一次";
+    });
+    return;
+  }
+
+  if (isEditMode.value) {
+    submitError.value = "無效的訓練紀錄 ID";
+  }
+});
 </script>
 
 <template>
@@ -131,7 +221,11 @@ async function submitForm() {
     class="border-2 border-[#222836] shadow-[inset_0_0_0_1px_rgba(143,245,255,0.06)]"
   >
     <div class="mx-auto max-w-[480px] px-4 pb-8 pt-6">
-      <form class="flex flex-col gap-3" novalidate @submit.prevent="submitForm">
+      <form
+        class="flex flex-col gap-3"
+        novalidate
+        @submit.prevent="handleSubmit"
+      >
         <label
           class="text-base uppercase tracking-[0.08em] text-[#8ff5ff]"
           for="action-name"
@@ -263,9 +357,15 @@ async function submitForm() {
         <button
           class="mt-2 h-12 border-0 rounded-md bg-gradient-to-r from-[#73d9df] to-[#8defff] font-bold uppercase tracking-[0.12em] text-[#154c5e] disabled:cursor-not-allowed disabled:opacity-50 enabled:hover:brightness-105"
           type="submit"
-          :disabled="isSubmitting"
+          :disabled="isSubmitting || isLoadingTraining"
         >
-          {{ isSubmitting ? "寫入中..." : "送出" }}
+          {{
+            isSubmitting || isLoadingTraining
+              ? "寫入中..."
+              : isEditMode
+                ? "更新"
+                : "送出"
+          }}
         </button>
 
         <button

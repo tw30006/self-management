@@ -18,6 +18,12 @@ const router = createRouter({
       meta: { requiresAuth: true },
     },
     {
+      path: "/trainings/edit/:id",
+      name: "training-edit",
+      component: () => import("../views/TrainingCreateView.vue"),
+      meta: { requiresAuth: true },
+    },
+    {
       path: "/login",
       name: "login",
       component: () => import("../views/Login.vue"),
