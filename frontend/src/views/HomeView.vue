@@ -73,9 +73,6 @@ onMounted(() => {
 <template>
   <section class="w-full self-start space-y-5">
     <header class="space-y-2">
-      <p class="text-xs uppercase tracking-[0.18em] text-[#8ff5ff]">
-        Telemetry stream active // protocol_441
-      </p>
       <div
         class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"
       >
@@ -84,9 +81,9 @@ onMounted(() => {
         </h2>
         <RouterLink
           to="/trainings/new"
-          class="inline-flex h-11 items-center justify-center rounded-md bg-[#7de8ef] px-4 text-sm font-semibold uppercase tracking-[0.12em] text-[#174452] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5ff]"
+          class="inline-flex h-11 items-center justify-center rounded-md bg-[#7de8ef] px-4 text-sm font-semibold tracking-[0.12em] text-[#174452] transition hover:brightness-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8ff5ff]"
         >
-          新增
+          Create Record
         </RouterLink>
       </div>
     </header>
@@ -146,9 +143,22 @@ onMounted(() => {
               TIME_STAMP: {{ formatTimestamp(training.performedAt) }}
             </p>
           </div>
-          <p class="text-[11px] uppercase tracking-[0.12em] text-[#4e657d]">
-            REF_{{ training.id }}
-          </p>
+          <div class="flex gap-2">
+            <RouterLink
+              :to="`/trainings/edit/${training.id}`"
+              class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#8FF5FF] bg-transparent text-[#8FF5FF] transition hover:bg-[#8FF5FF]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8FF5FF] cursor-pointer"
+            >
+              <span class="material-symbols-outlined edit-icon">edit</span>
+            </RouterLink>
+
+            <button
+              aria-label="Delete"
+              class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#FF716C] bg-transparent text-[#FF716C] transition hover:bg-[#FF716C]/10 focus-visible:outline-none focus-visible:ring-[#FF716C] cursor-pointer"
+              type="button"
+            >
+              <span class="material-symbols-outlined delete-icon">delete</span>
+            </button>
+          </div>
         </div>
 
         <div
@@ -221,3 +231,11 @@ onMounted(() => {
     </div>
   </section>
 </template>
+<style scoped>
+.delete-icon {
+  font-size: 22px;
+}
+.edit-icon {
+  font-size: 20px;
+}
+</style>
