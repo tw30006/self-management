@@ -7,13 +7,39 @@ import {
   type TrainingsPaginationMeta,
 } from "../api/trainings";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.vue";
+import SelectedDay from "../components/SelectedDay.vue";
 
 const trainings = ref<TrainingRecord[]>([]);
 const isLoading = ref(false);
 const isDeleting = ref(false);
 const errorMsg = ref("");
 const isDeleteModalOpen = ref(false);
+const selectedDate = ref<string | null>(null);
 const trainingToDelete = ref<TrainingRecord | null>(null);
+
+const toLocalDateKey = (iso: string) => {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const isFiltering = computed(() => Boolean(selectedDate.value));
+
+const filteredTrainings = computed(() => {
+  if (!selectedDate.value) {
+    return trainings.value;
+  }
+
+  return trainings.value.filter(
+    (t) => toLocalDateKey(t.performedAt) === selectedDate.value,
+  );
+});
 const pagination = ref<TrainingsPaginationMeta>({
   total: 0,
   page: 1,
@@ -23,8 +49,7 @@ const pagination = ref<TrainingsPaginationMeta>({
 const totalPages = computed(() =>
   Math.max(1, Math.ceil(pagination.value.total / pagination.value.limit)),
 );
-const canGoPrev = computed(() => pagination.value.page > 1);
-const canGoNext = computed(() => pagination.value.page < totalPages.value);
+
 const deleteModalMessage = computed(() => {
   if (!trainingToDelete.value) {
     return "這筆資料刪除後無法復原，確定要繼續嗎？";
@@ -173,8 +198,12 @@ onMounted(() => {
     </div>
 
     <div v-else class="space-y-4">
+      <SelectedDay v-model="selectedDate" />
+      <p v-if="isFiltering" class="text-md text-[#8aa3bc]">
+        {{ selectedDate }} 的訓練紀錄，共 {{ filteredTrainings.length }} 筆
+      </p>
       <article
-        v-for="training in trainings"
+        v-for="training in filteredTrainings"
         :key="training.id"
         class="rounded-md border border-[#1f2e3f] bg-gradient-to-r from-[#0c1220] to-[#101a2b] px-4 py-5 shadow-[inset_0_0_0_1px_rgba(143,245,255,0.05)] sm:px-6"
       >
@@ -251,11 +280,12 @@ onMounted(() => {
 
       <nav
         class="flex items-center justify-between rounded-md border border-[#1a2e40] bg-[#0b1524]/70 px-4 py-3 text-sm text-[#a8bdd2]"
+        v-if="!isFiltering || totalPages > 1"
       >
         <button
           class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
-          :disabled="!canGoPrev"
+          :disabled="pagination.page <= 1"
           @click="fetchTrainings(pagination.page - 1)"
         >
           上一頁
@@ -269,7 +299,7 @@ onMounted(() => {
         <button
           class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
           type="button"
-          :disabled="!canGoNext"
+          :disabled="pagination.page >= totalPages"
           @click="fetchTrainings(pagination.page + 1)"
         >
           下一頁
