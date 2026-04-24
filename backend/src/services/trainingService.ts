@@ -7,8 +7,49 @@ import { Prisma } from "@prisma/client";
 import { HttpError } from "../utils/httpError";
 import type {
   CreateTrainingInput,
+  TrainingsByDateQueryInput,
+  TrainingMarkersQueryInput,
   UpdateTrainingInput,
 } from "../models/training";
+
+function parseMonthRange(month: string) {
+  const [yearStr, monthStr] = month.split("-");
+  const year = Number(yearStr);
+  const monthIndex = Number(monthStr) - 1;
+
+  if (
+    !Number.isInteger(year) ||
+    !Number.isInteger(monthIndex) ||
+    monthIndex < 0 ||
+    monthIndex > 11
+  ) {
+    throw new HttpError(400, "month 格式需為 YYYY-MM", "INVALID_QUERY");
+  }
+
+  const start = new Date(Date.UTC(year, monthIndex, 1, 0, 0, 0, 0));
+  const end = new Date(Date.UTC(year, monthIndex + 1, 1, 0, 0, 0, 0));
+
+  return { start, end };
+}
+
+function parseDateRange(date: string) {
+  const parsed = new Date(`${date}T00:00:00.000Z`);
+
+  if (Number.isNaN(parsed.getTime())) {
+    throw new HttpError(400, "date 格式需為 YYYY-MM-DD", "INVALID_QUERY");
+  }
+
+  // 防止像 2026-02-30 被 Date 自動滾成 3 月 2 日
+  if (parsed.toISOString().slice(0, 10) !== date) {
+    throw new HttpError(400, "date 格式需為 YYYY-MM-DD", "INVALID_QUERY");
+  }
+
+  const start = parsed;
+  const end = new Date(start);
+  end.setUTCDate(end.getUTCDate() + 1);
+
+  return { start, end };
+}
 
 // 取得該使用者的訓練列表（含分頁）
 export async function listTrainings(
@@ -33,6 +74,65 @@ export async function listTrainings(
   return {
     trainings,
     meta: { total, page, limit },
+  };
+}
+
+export async function getTrainingMarkers(
+  userId: number,
+  query: TrainingMarkersQueryInput,
+) {
+  const { start, end } = parseMonthRange(query.month);
+
+  const trainings = await prisma.training.findMany({
+    where: {
+      userId,
+      performedAt: {
+        gte: start,
+        lt: end,
+      },
+    },
+    select: {
+      performedAt: true,
+    },
+    orderBy: {
+      performedAt: "asc",
+    },
+  });
+
+  const dates = Array.from(
+    new Set(
+      trainings.map((training) =>
+        training.performedAt.toISOString().slice(0, 10),
+      ),
+    ),
+  );
+
+  return {
+    month: query.month,
+    dates,
+  };
+}
+
+export async function getTrainingsByDate(
+  userId: number,
+  query: TrainingsByDateQueryInput,
+) {
+  const { start, end } = parseDateRange(query.date);
+
+  const trainings = await prisma.training.findMany({
+    where: {
+      userId,
+      performedAt: {
+        gte: start,
+        lt: end,
+      },
+    },
+    orderBy: { performedAt: "desc" },
+  });
+
+  return {
+    date: query.date,
+    trainings,
   };
 }
 

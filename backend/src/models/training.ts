@@ -30,5 +30,19 @@ export const createTrainingSchema = z.object({
 // 更新時所有欄位都是選填
 export const updateTrainingSchema = createTrainingSchema.partial();
 
+export const trainingMarkersQuerySchema = z.object({
+  month: z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, "month 格式需為 YYYY-MM"),
+});
+
+export const trainingsByDateQuerySchema = z.object({
+  date: z.iso.date("date 格式需為 YYYY-MM-DD"),
+});
+
 export type CreateTrainingInput = z.infer<typeof createTrainingSchema>;
 export type UpdateTrainingInput = z.infer<typeof updateTrainingSchema>;
+export type TrainingMarkersQueryInput = z.infer<
+  typeof trainingMarkersQuerySchema
+>;
+export type TrainingsByDateQueryInput = z.infer<
+  typeof trainingsByDateQuerySchema
+>;

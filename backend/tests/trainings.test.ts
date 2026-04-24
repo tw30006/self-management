@@ -121,6 +121,103 @@ describe("GET /trainings", () => {
   });
 });
 
+describe("GET /trainings/markers", () => {
+  beforeEach(async () => {
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-01-15T10:00:00.000Z" });
+
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-01-15T12:00:00.000Z" });
+
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-01-20T10:00:00.000Z" });
+
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-02-01T10:00:00.000Z" });
+  });
+
+  it("回傳該月有訓練的日期清單（去重）", async () => {
+    const res = await request(app)
+      .get("/trainings/markers?month=2024-01")
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.month).toBe("2024-01");
+    expect(res.body.data.dates).toEqual(["2024-01-15", "2024-01-20"]);
+  });
+
+  it("month 格式錯誤回傳 400", async () => {
+    const res = await request(app)
+      .get("/trainings/markers?month=2024-13")
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("VALIDATION_ERROR");
+  });
+});
+
+describe("GET /trainings/by-date", () => {
+  beforeEach(async () => {
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-01-15T10:00:00.000Z" });
+
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-01-15T12:00:00.000Z" });
+
+    await request(app)
+      .post("/trainings")
+      .set("Authorization", `Bearer ${authToken}`)
+      .send({ ...sampleTraining, performed_at: "2024-01-16T10:00:00.000Z" });
+  });
+
+  it("回傳指定日期的訓練列表", async () => {
+    const res = await request(app)
+      .get("/trainings/by-date?date=2024-01-15")
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.success).toBe(true);
+    expect(res.body.data.date).toBe("2024-01-15");
+    expect(res.body.data.trainings).toHaveLength(2);
+    expect(
+      res.body.data.trainings.every((training: { performedAt: string }) =>
+        training.performedAt.startsWith("2024-01-15"),
+      ),
+    ).toBe(true);
+  });
+
+  it("當日無資料時回傳空陣列", async () => {
+    const res = await request(app)
+      .get("/trainings/by-date?date=2024-01-31")
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.status).toBe(200);
+    expect(res.body.data.trainings).toEqual([]);
+  });
+
+  it("date 格式錯誤回傳 400", async () => {
+    const res = await request(app)
+      .get("/trainings/by-date?date=2024-02-30")
+      .set("Authorization", `Bearer ${authToken}`);
+
+    expect(res.status).toBe(400);
+    expect(res.body.error.code).toBe("VALIDATION_ERROR");
+  });
+});
+
 describe("GET /trainings/:id", () => {
   it("取得單一訓練紀錄", async () => {
     const createRes = await request(app)
