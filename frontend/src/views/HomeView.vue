@@ -8,6 +8,7 @@ import {
 } from "../api/trainings";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.vue";
 import SelectedDay from "../components/SelectedDay.vue";
+import Calendar from "../components/Calendar.vue";
 
 const trainings = ref<TrainingRecord[]>([]);
 const isLoading = ref(false);
@@ -158,7 +159,7 @@ onMounted(() => {
         </RouterLink>
       </div>
     </header>
-
+    <Calendar />
     <div v-if="isLoading" class="space-y-4">
       <article
         v-for="index in 3"

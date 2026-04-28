@@ -9,9 +9,11 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@popperjs/core": "^2.11.8",
     "@tailwindcss/vite": "^4.2.2",
     "pinia": "^3.0.4",
     "tailwindcss": "^4.2.2",
+    "v-calendar": "^3.1.2",
     "vue": "^3.5.30",
     "vue-router": "^5.0.4"
   },
