@@ -7,7 +7,6 @@ import {
   type TrainingsPaginationMeta,
 } from "../api/trainings";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.vue";
-import SelectedDay from "../components/SelectedDay.vue";
 import Calendar from "../components/Calendar.vue";
 
 const trainings = ref<TrainingRecord[]>([]);
@@ -30,16 +29,22 @@ const toLocalDateKey = (iso: string) => {
   return `${year}-${month}-${day}`;
 };
 
-const isFiltering = computed(() => Boolean(selectedDate.value));
-
 const filteredTrainings = computed(() => {
   if (!selectedDate.value) {
-    return trainings.value;
+    return [];
   }
 
   return trainings.value.filter(
     (t) => toLocalDateKey(t.performedAt) === selectedDate.value,
   );
+});
+
+const trainingDates = computed(() => {
+  const dates = trainings.value
+    .map((t) => toLocalDateKey(t.performedAt))
+    .filter((date): date is string => date !== null);
+
+  return [...new Set(dates)];
 });
 const pagination = ref<TrainingsPaginationMeta>({
   total: 0,
@@ -159,7 +164,8 @@ onMounted(() => {
         </RouterLink>
       </div>
     </header>
-    <Calendar />
+    <Calendar v-model="selectedDate" :training-dates="trainingDates" />
+
     <div v-if="isLoading" class="space-y-4">
       <article
         v-for="index in 3"
@@ -199,113 +205,135 @@ onMounted(() => {
     </div>
 
     <div v-else class="space-y-4">
-      <SelectedDay v-model="selectedDate" />
-      <p v-if="isFiltering" class="text-md text-[#8aa3bc]">
-        {{ selectedDate }} 的訓練紀錄，共 {{ filteredTrainings.length }} 筆
+      <p v-if="!selectedDate" class="text-lg text-[#8aa3bc]">
+        請先在日曆中點選有訓練的日期
       </p>
-      <article
-        v-for="training in filteredTrainings"
-        :key="training.id"
-        class="rounded-md border border-[#1f2e3f] bg-gradient-to-r from-[#0c1220] to-[#101a2b] px-4 py-5 shadow-[inset_0_0_0_1px_rgba(143,245,255,0.05)] sm:px-6"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <h3
-              class="text-2xl font-semibold uppercase tracking-[0.04em] text-[#e9f4ff]"
-            >
-              {{ training.actionName }}
-            </h3>
-            <p class="mt-1 text-xs uppercase tracking-[0.12em] text-[#7c93ad]">
-              TIME_STAMP: {{ formatTimestamp(training.performedAt) }}
-            </p>
-          </div>
-          <div class="flex gap-2">
-            <RouterLink
-              :to="`/trainings/edit/${training.id}`"
-              class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#8FF5FF] bg-transparent text-[#8FF5FF] transition hover:bg-[#8FF5FF]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8FF5FF] cursor-pointer"
-            >
-              <span class="material-symbols-outlined edit-icon">edit</span>
-            </RouterLink>
 
-            <button
-              aria-label="Delete"
-              class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#FF716C] bg-transparent text-[#FF716C] transition hover:bg-[#FF716C]/10 focus-visible:outline-none focus-visible:ring-[#FF716C] cursor-pointer"
-              type="button"
-              @click="openDeleteModal(training)"
-            >
-              <span class="material-symbols-outlined delete-icon">delete</span>
-            </button>
-          </div>
-        </div>
-
-        <div
-          class="mt-5 grid grid-cols-3 divide-x divide-[#172435] border-y border-[#162638] py-4"
-        >
-          <div class="px-3 text-center">
-            <p class="text-[10px] uppercase tracking-[0.18em] text-[#607a96]">
-              SETS
-            </p>
-            <p class="mt-1 text-3xl font-semibold text-[#edf3fb]">
-              {{ training.sets }}
-            </p>
-          </div>
-          <div class="px-3 text-center">
-            <p class="text-[10px] uppercase tracking-[0.18em] text-[#607a96]">
-              REPS
-            </p>
-            <p class="mt-1 text-3xl font-semibold text-[#edf3fb]">
-              {{ training.reps }}
-            </p>
-          </div>
-          <div class="px-3 text-center">
-            <p class="text-[10px] uppercase tracking-[0.18em] text-[#607a96]">
-              WEIGHT
-            </p>
-            <p class="mt-1 text-3xl font-semibold text-[#7de8ef]">
-              {{ formatWeight(training.weight) }}
-            </p>
-          </div>
-        </div>
-
-        <div
-          class="mt-4 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
-        >
-          <p v-if="training.heartRate !== null" class="text-[#b6a4ff]">
-            ♡ {{ training.heartRate }} BPM
-          </p>
-          <p v-if="training.notes" class="sm:ml-auto text-[#9caec0] italic">
-            "{{ training.notes }}"
-          </p>
-        </div>
-      </article>
-
-      <nav
-        class="flex items-center justify-between rounded-md border border-[#1a2e40] bg-[#0b1524]/70 px-4 py-3 text-sm text-[#a8bdd2]"
-        v-if="!isFiltering || totalPages > 1"
-      >
-        <button
-          class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
-          :disabled="pagination.page <= 1"
-          @click="fetchTrainings(pagination.page - 1)"
-        >
-          上一頁
-        </button>
-
-        <p>
-          第 {{ pagination.page }} / {{ totalPages }} 頁 • 共
-          {{ pagination.total }} 筆
+      <template v-else>
+        <p class="text-lg text-[#8aa3bc]">
+          <span class="text-[#8FF5FF] font-bold">{{ selectedDate }}</span>
+          的訓練紀錄，共
+          <span class="text-[#8FF5FF] font-bold">{{
+            filteredTrainings.length
+          }}</span>
+          筆
         </p>
 
-        <button
-          class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
-          type="button"
-          :disabled="pagination.page >= totalPages"
-          @click="fetchTrainings(pagination.page + 1)"
+        <p
+          v-if="filteredTrainings.length === 0"
+          class="rounded-md border border-[#1e3445] bg-[#0e1725]/70 p-4 text-[#d7e7f4]"
         >
-          下一頁
-        </button>
-      </nav>
+          此日期沒有訓練紀錄
+        </p>
+
+        <article
+          v-for="training in filteredTrainings"
+          :key="training.id"
+          class="rounded-md border border-[#1f2e3f] bg-gradient-to-r from-[#0c1220] to-[#101a2b] px-4 py-5 shadow-[inset_0_0_0_1px_rgba(143,245,255,0.05)] sm:px-6"
+        >
+          <div class="flex items-start justify-between gap-3">
+            <div>
+              <h3
+                class="text-2xl font-semibold uppercase tracking-[0.04em] text-[#e9f4ff]"
+              >
+                {{ training.actionName }}
+              </h3>
+              <p
+                class="mt-1 text-xs uppercase tracking-[0.12em] text-[#7c93ad]"
+              >
+                TIME_STAMP: {{ formatTimestamp(training.performedAt) }}
+              </p>
+            </div>
+            <div class="flex gap-2">
+              <RouterLink
+                :to="`/trainings/edit/${training.id}`"
+                class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#8FF5FF] bg-transparent text-[#8FF5FF] transition hover:bg-[#8FF5FF]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#8FF5FF] cursor-pointer"
+              >
+                <span class="material-symbols-outlined edit-icon">edit</span>
+              </RouterLink>
+
+              <button
+                aria-label="Delete"
+                class="inline-flex w-[32px] h-[32px] items-center justify-center rounded-sm border border-[#FF716C] bg-transparent text-[#FF716C] transition hover:bg-[#FF716C]/10 focus-visible:outline-none focus-visible:ring-[#FF716C] cursor-pointer"
+                type="button"
+                @click="openDeleteModal(training)"
+              >
+                <span class="material-symbols-outlined delete-icon"
+                  >delete</span
+                >
+              </button>
+            </div>
+          </div>
+
+          <div
+            class="mt-5 grid grid-cols-3 divide-x divide-[#172435] border-y border-[#162638] py-4"
+          >
+            <div class="px-3 text-center">
+              <p class="text-[10px] uppercase tracking-[0.18em] text-[#607a96]">
+                SETS
+              </p>
+              <p class="mt-1 text-3xl font-semibold text-[#edf3fb]">
+                {{ training.sets }}
+              </p>
+            </div>
+            <div class="px-3 text-center">
+              <p class="text-[10px] uppercase tracking-[0.18em] text-[#607a96]">
+                REPS
+              </p>
+              <p class="mt-1 text-3xl font-semibold text-[#edf3fb]">
+                {{ training.reps }}
+              </p>
+            </div>
+            <div class="px-3 text-center">
+              <p class="text-[10px] uppercase tracking-[0.18em] text-[#607a96]">
+                WEIGHT
+              </p>
+              <p class="mt-1 text-3xl font-semibold text-[#7de8ef]">
+                {{ formatWeight(training.weight) }}
+              </p>
+            </div>
+          </div>
+
+          <div
+            class="mt-4 flex flex-col gap-2 text-sm sm:flex-row sm:items-center sm:justify-between"
+          >
+            <p v-if="training.heartRate !== null" class="text-[#b6a4ff]">
+              ♡ {{ training.heartRate }} BPM
+            </p>
+            <p v-if="training.notes" class="sm:ml-auto text-[#9caec0] italic">
+              "{{ training.notes }}"
+            </p>
+          </div>
+        </article>
+
+        <nav
+          class="flex items-center justify-between rounded-md border border-[#1a2e40] bg-[#0b1524]/70 px-4 py-3 text-sm text-[#a8bdd2]"
+          v-if="totalPages > 1"
+        >
+          <button
+            class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="pagination.page <= 1"
+            @click="fetchTrainings(pagination.page - 1)"
+          >
+            上一頁
+          </button>
+
+          <p>
+            第 {{ pagination.page }} / {{ totalPages }} 頁 • 共
+            {{ pagination.total }} 筆
+          </p>
+
+          <button
+            class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
+            type="button"
+            :disabled="pagination.page >= totalPages"
+            @click="fetchTrainings(pagination.page + 1)"
+          >
+            下一頁
+          </button>
+        </nav>
+      </template>
     </div>
 
     <DeleteConfirmModal
