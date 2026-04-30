@@ -1,18 +1,19 @@
 <script setup lang="ts">
-import { computed } from "vue";
+import { computed, ref } from "vue";
 
 const props = withDefaults(
   defineProps<{
     modelValue: string | null;
-    trainingDates: string[];
+    markerDates: string[];
   }>(),
   {
-    trainingDates: () => [],
+    markerDates: () => [],
   },
 );
 
 const emit = defineEmits<{
   (e: "update:modelValue", value: string | null): void;
+  (e: "month-change", value: string): void;
 }>();
 
 type CalendarDayClick = {
@@ -43,11 +44,42 @@ const parseDateKey = (value: string) => {
   return date;
 };
 
-const trainingDateSet = computed(() => new Set(props.trainingDates));
+const markerDateSet = computed(() => new Set(props.markerDates));
+
+const today = new Date();
+const visibleYear = ref(today.getFullYear());
+const visibleMonth = ref(today.getMonth());
+
+const toDateKey = (date: Date) => {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
+
+const getAllDatesInMonth = (year: number, month: number) => {
+  const lastDay = new Date(year, month + 1, 0).getDate();
+  return Array.from(
+    { length: lastDay },
+    (_, index) => new Date(year, month, index + 1),
+  );
+};
+
+function handleDidMove(pages: Array<{ year: number; month: number }>) {
+  const currentPage = pages[0];
+  if (!currentPage) {
+    return;
+  }
+
+  visibleYear.value = currentPage.year;
+  visibleMonth.value = currentPage.month - 1;
+  const monthKey = `${visibleYear.value}-${(visibleMonth.value + 1).toString().padStart(2, "0")}`;
+  emit("month-change", monthKey);
+}
 
 function handleDayClick(day: CalendarDayClick) {
   const dateKey = day.id;
-  if (trainingDateSet.value.has(dateKey)) {
+  if (markerDateSet.value.has(dateKey)) {
     emit("update:modelValue", dateKey);
     return;
   }
@@ -56,13 +88,25 @@ function handleDayClick(day: CalendarDayClick) {
 }
 
 const attributes = computed(() => {
-  const trainingDayDates = props.trainingDates
+  const trainingDayDates = props.markerDates
     .map(parseDateKey)
     .filter((date): date is Date => date !== null);
 
-  const selectedDate = props.modelValue ? parseDateKey(props.modelValue) : null;
+  const monthDates = getAllDatesInMonth(visibleYear.value, visibleMonth.value);
+  const nonTrainingDayDates = monthDates.filter(
+    (date) => !markerDateSet.value.has(toDateKey(date)),
+  );
 
   return [
+    {
+      key: "non-training-days",
+      dates: nonTrainingDayDates,
+      highlight: {
+        fillMode: "light",
+        color: "gray",
+      },
+      popover: false,
+    },
     {
       key: "training-days",
       dates: trainingDayDates,
@@ -80,19 +124,27 @@ const attributes = computed(() => {
         color: "blue",
       },
     },
-    {
-      key: "selected-day",
-      dates: selectedDate ?? [],
-      contentStyle: {
-        color: "#0f172a",
-      },
-    },
   ];
 });
 </script>
 <template>
   <div class="my-calendar">
-    <VCalendar :attributes="attributes" is-dark @dayclick="handleDayClick" />
+    <VCalendar
+      :attributes="attributes"
+      is-dark
+      @dayclick="handleDayClick"
+      @did-move="handleDidMove"
+    />
+  </div>
+  <div class="text-sm text-gray-400 flex items-center gap-4">
+    <span class="flex items-center">
+      <span class="w-3 h-3 bg-[#991b1b] rounded-full mr-1"></span>
+      訓練日期
+    </span>
+    <span class="flex items-center">
+      <span class="w-3 h-3 bg-[#3b82f6] rounded-full mr-1"></span>
+      今天
+    </span>
   </div>
 </template>
 
@@ -100,9 +152,8 @@ const attributes = computed(() => {
 .my-calendar {
   display: flex;
   justify-content: center;
-  padding: 20px 0;
+  padding-top: 20px;
   max-width: 500px;
-  margin: 0 auto;
 }
 .my-calendar :deep(.vc-container) {
   background-color: #1f2e45;

@@ -1,60 +1,63 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from "vue";
+import { computed, ref, watch } from "vue";
 import {
   deleteTraining,
-  getTrainings,
   type TrainingRecord,
-  type TrainingsPaginationMeta,
+  getTrainingMarkers,
+  getTrainingsByDate,
 } from "../api/trainings";
 import DeleteConfirmModal from "../components/DeleteConfirmModal.vue";
 import Calendar from "../components/Calendar.vue";
 
-const trainings = ref<TrainingRecord[]>([]);
-const isLoading = ref(false);
-const isDeleting = ref(false);
-const errorMsg = ref("");
-const isDeleteModalOpen = ref(false);
-const selectedDate = ref<string | null>(null);
-const trainingToDelete = ref<TrainingRecord | null>(null);
-
-const toLocalDateKey = (iso: string) => {
-  const date = new Date(iso);
-  if (Number.isNaN(date.getTime())) {
-    return null;
-  }
-
+function toMonthKey(date: Date) {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
+  return `${year}-${month}`;
+}
+
+const isMarkersLoading = ref(false);
+const isByDateLoading = ref(false);
+const isDeleting = ref(false);
+const markersErrorMsg = ref("");
+const byDateErrorMsg = ref("");
+const isDeleteModalOpen = ref(false);
+const selectedDay = ref<string | null>(null);
+const trainingToDelete = ref<TrainingRecord | null>(null);
+const markerDates = ref<string[]>([]);
+const selectedDateTrainings = ref<TrainingRecord[]>([]);
+const visibleMonth = ref(toMonthKey(new Date()));
+
+//取得被選取月份的日期
+const getTrainingMarkersForMonth = async (month: string) => {
+  isMarkersLoading.value = true;
+  markersErrorMsg.value = "";
+
+  try {
+    const response = await getTrainingMarkers(month);
+    markerDates.value = response.dates;
+  } catch {
+    markerDates.value = [];
+    markersErrorMsg.value = "讀取日曆標記失敗，請稍後再試。";
+  } finally {
+    isMarkersLoading.value = false;
+  }
 };
 
-const filteredTrainings = computed(() => {
-  if (!selectedDate.value) {
-    return [];
+//取得選中日期的訓練紀錄
+const getTrainingsForSelectedDate = async (date: string) => {
+  isByDateLoading.value = true;
+  byDateErrorMsg.value = "";
+
+  try {
+    const response = await getTrainingsByDate(date);
+    selectedDateTrainings.value = response.trainings;
+  } catch {
+    selectedDateTrainings.value = [];
+    byDateErrorMsg.value = "讀取當日訓練紀錄失敗，請稍後再試。";
+  } finally {
+    isByDateLoading.value = false;
   }
-
-  return trainings.value.filter(
-    (t) => toLocalDateKey(t.performedAt) === selectedDate.value,
-  );
-});
-
-const trainingDates = computed(() => {
-  const dates = trainings.value
-    .map((t) => toLocalDateKey(t.performedAt))
-    .filter((date): date is string => date !== null);
-
-  return [...new Set(dates)];
-});
-const pagination = ref<TrainingsPaginationMeta>({
-  total: 0,
-  page: 1,
-  limit: 20,
-});
-
-const totalPages = computed(() =>
-  Math.max(1, Math.ceil(pagination.value.total / pagination.value.limit)),
-);
+};
 
 const deleteModalMessage = computed(() => {
   if (!trainingToDelete.value) {
@@ -93,21 +96,6 @@ function formatWeight(weight: string) {
   return `${value.toFixed(1)} kg`;
 }
 
-async function fetchTrainings(page = 1) {
-  isLoading.value = true;
-  errorMsg.value = "";
-
-  try {
-    const response = await getTrainings(page, pagination.value.limit);
-    trainings.value = response.trainings;
-    pagination.value = response.meta;
-  } catch {
-    errorMsg.value = "讀取訓練紀錄失敗，請稍後再試。";
-  } finally {
-    isLoading.value = false;
-  }
-}
-
 function openDeleteModal(training: TrainingRecord) {
   trainingToDelete.value = training;
   isDeleteModalOpen.value = true;
@@ -117,7 +105,6 @@ function closeDeleteModal(force = false) {
   if (isDeleting.value && !force) {
     return;
   }
-
   isDeleteModalOpen.value = false;
   trainingToDelete.value = null;
 }
@@ -132,8 +119,13 @@ async function confirmDeleteTraining() {
   try {
     const deletedId = trainingToDelete.value.id;
     await deleteTraining(deletedId);
-    trainings.value = trainings.value.filter((t) => t.id !== deletedId);
-    pagination.value.total = Math.max(0, pagination.value.total - 1);
+    selectedDateTrainings.value = selectedDateTrainings.value.filter(
+      (t) => t.id !== deletedId,
+    );
+    if (selectedDateTrainings.value.length === 0) {
+      await getTrainingMarkersForMonth(visibleMonth.value);
+    }
+
     closeDeleteModal(true);
   } catch {
     alert("刪除失敗，請稍後再試一次");
@@ -141,10 +133,32 @@ async function confirmDeleteTraining() {
     isDeleting.value = false;
   }
 }
+function handleMonthChange(monthKey: string) {
+  if (visibleMonth.value === monthKey) {
+    return;
+  }
 
-onMounted(() => {
-  void fetchTrainings();
+  visibleMonth.value = monthKey;
+  selectedDay.value = null;
+  selectedDateTrainings.value = [];
+  byDateErrorMsg.value = "";
+}
+
+watch(selectedDay, (newDay) => {
+  if (newDay) {
+    void getTrainingsForSelectedDate(newDay);
+  } else {
+    selectedDateTrainings.value = [];
+    byDateErrorMsg.value = "";
+  }
 });
+watch(
+  visibleMonth,
+  (newMonth) => {
+    void getTrainingMarkersForMonth(newMonth);
+  },
+  { immediate: true },
+);
 </script>
 
 <template>
@@ -164,9 +178,34 @@ onMounted(() => {
         </RouterLink>
       </div>
     </header>
-    <Calendar v-model="selectedDate" :training-dates="trainingDates" />
+    <Calendar
+      v-model="selectedDay"
+      :marker-dates="markerDates"
+      @month-change="handleMonthChange"
+    />
+    <p v-if="!selectedDay" class="text-lg text-[#8aa3bc]">
+      請先在日曆中點選有訓練的日期
+    </p>
 
-    <div v-if="isLoading" class="space-y-4">
+    <p v-if="isMarkersLoading" class="text-sm text-[#8aa3bc]">
+      正在更新本月訓練標記...
+    </p>
+
+    <div
+      v-if="markersErrorMsg"
+      class="rounded-md border border-[#46303d] bg-[#2a1820]/70 p-5 text-[#ffb7c4]"
+    >
+      <p class="text-sm">{{ markersErrorMsg }}</p>
+      <button
+        class="mt-3 inline-flex h-10 items-center justify-center rounded-md border border-[#ff8fa0] px-4 text-sm font-medium text-[#ffcad4] hover:bg-[#ff8fa0]/10"
+        type="button"
+        @click="getTrainingMarkersForMonth(visibleMonth)"
+      >
+        重試
+      </button>
+    </div>
+
+    <div v-if="selectedDay && isByDateLoading" class="space-y-4">
       <article
         v-for="index in 3"
         :key="index"
@@ -175,59 +214,39 @@ onMounted(() => {
     </div>
 
     <div
-      v-else-if="errorMsg"
+      v-else-if="byDateErrorMsg"
       class="rounded-md border border-[#46303d] bg-[#2a1820]/70 p-5 text-[#ffb7c4]"
     >
-      <p class="text-sm">{{ errorMsg }}</p>
+      <p class="text-sm">{{ byDateErrorMsg }}</p>
       <button
         class="mt-3 inline-flex h-10 items-center justify-center rounded-md border border-[#ff8fa0] px-4 text-sm font-medium text-[#ffcad4] hover:bg-[#ff8fa0]/10"
         type="button"
-        @click="fetchTrainings(pagination.page)"
+        @click="selectedDay && getTrainingsForSelectedDate(selectedDay)"
       >
         重試
       </button>
     </div>
 
-    <div
-      v-else-if="trainings.length === 0"
-      class="rounded-md border border-[#1e3445] bg-[#0e1725]/70 p-6 text-center"
-    >
-      <p class="text-lg font-medium text-[#d7e7f4]">目前沒有訓練紀錄</p>
-      <p class="mt-1 text-sm text-[#8aa3bc]">
-        建立第一筆紀錄開始追蹤你的訓練進度
-      </p>
-      <RouterLink
-        to="/trainings/new"
-        class="mt-4 inline-flex h-10 items-center justify-center rounded-md bg-[#7de8ef] px-4 text-sm font-semibold uppercase tracking-[0.1em] text-[#174452] hover:brightness-105"
-      >
-        建立第一筆
-      </RouterLink>
-    </div>
-
     <div v-else class="space-y-4">
-      <p v-if="!selectedDate" class="text-lg text-[#8aa3bc]">
-        請先在日曆中點選有訓練的日期
-      </p>
-
-      <template v-else>
+      <template v-if="selectedDay">
         <p class="text-lg text-[#8aa3bc]">
-          <span class="text-[#8FF5FF] font-bold">{{ selectedDate }}</span>
+          <span class="text-[#8FF5FF] font-bold">{{ selectedDay }}</span>
           的訓練紀錄，共
           <span class="text-[#8FF5FF] font-bold">{{
-            filteredTrainings.length
+            selectedDateTrainings.length
           }}</span>
           筆
         </p>
 
         <p
-          v-if="filteredTrainings.length === 0"
+          v-if="selectedDateTrainings.length === 0"
           class="rounded-md border border-[#1e3445] bg-[#0e1725]/70 p-4 text-[#d7e7f4]"
         >
           此日期沒有訓練紀錄
         </p>
 
         <article
-          v-for="training in filteredTrainings"
+          v-for="training in selectedDateTrainings"
           :key="training.id"
           class="rounded-md border border-[#1f2e3f] bg-gradient-to-r from-[#0c1220] to-[#101a2b] px-4 py-5 shadow-[inset_0_0_0_1px_rgba(143,245,255,0.05)] sm:px-6"
         >
@@ -305,34 +324,6 @@ onMounted(() => {
             </p>
           </div>
         </article>
-
-        <nav
-          class="flex items-center justify-between rounded-md border border-[#1a2e40] bg-[#0b1524]/70 px-4 py-3 text-sm text-[#a8bdd2]"
-          v-if="totalPages > 1"
-        >
-          <button
-            class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="pagination.page <= 1"
-            @click="fetchTrainings(pagination.page - 1)"
-          >
-            上一頁
-          </button>
-
-          <p>
-            第 {{ pagination.page }} / {{ totalPages }} 頁 • 共
-            {{ pagination.total }} 筆
-          </p>
-
-          <button
-            class="rounded-md border border-[#2b465f] px-3 py-1.5 transition hover:border-[#8ff5ff] disabled:cursor-not-allowed disabled:opacity-50"
-            type="button"
-            :disabled="pagination.page >= totalPages"
-            @click="fetchTrainings(pagination.page + 1)"
-          >
-            下一頁
-          </button>
-        </nav>
       </template>
     </div>
 

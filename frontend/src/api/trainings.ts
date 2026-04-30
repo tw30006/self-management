@@ -34,6 +34,17 @@ export interface TrainingsPage {
   trainings: TrainingRecord[];
   meta: TrainingsPaginationMeta;
 }
+
+export interface TrainingMarkersResponse {
+  month: string;
+  dates: string[];
+}
+
+export interface TrainingsByDateResponse {
+  date: string;
+  trainings: TrainingRecord[];
+}
+
 export function getTraining(id: number) {
   return apiGet<TrainingRecord>(`/trainings/${id}`);
 }
@@ -60,4 +71,18 @@ export function editTraining(
 
 export function deleteTraining(id: number) {
   return apiDelete<void>(`/trainings/${id}`);
+}
+
+export function getTrainingMarkers(month: string) {
+  const query = new URLSearchParams({ month });
+  return apiGet<TrainingMarkersResponse>(
+    `/trainings/markers?${query.toString()}`,
+  );
+}
+
+export function getTrainingsByDate(date: string) {
+  const query = new URLSearchParams({ date });
+  return apiGet<TrainingsByDateResponse>(
+    `/trainings/by-date?${query.toString()}`,
+  );
 }
