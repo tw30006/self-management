@@ -34,15 +34,15 @@ const router = createRouter({
 router.beforeEach(async (to) => {
   const auth = useAuthStore();
 
-  if (!auth.isHydrated) {
-    await auth.hydrateSession();
+  if (!auth.isSessionChecked) {
+    await auth.checkSession();
   }
 
-  if (to.meta.requiresAuth && !auth.isAuthenticated) {
+  if (to.meta.requiresAuth && !auth.isLoggedIn) {
     return { name: "login" };
   }
 
-  if (to.name === "login" && auth.isAuthenticated) {
+  if (to.name === "login" && auth.isLoggedIn) {
     return { name: "home" };
   }
 });

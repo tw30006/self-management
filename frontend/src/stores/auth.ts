@@ -4,12 +4,12 @@ import { getMe, logout as logoutRequest, type AuthUser } from "../api/auth";
 
 export const useAuthStore = defineStore("auth", () => {
   const user = ref<AuthUser | null>(null);
-  const isHydrated = ref(false);
+  const isSessionChecked = ref(false);
 
-  const isAuthenticated = computed(() => user.value !== null);
+  const isLoggedIn = computed(() => user.value !== null);
 
-  async function hydrateSession(force = false) {
-    if (isHydrated.value && !force) {
+  async function checkSession(forceRefresh = false) {
+    if (isSessionChecked.value && !forceRefresh) {
       return;
     }
 
@@ -18,7 +18,7 @@ export const useAuthStore = defineStore("auth", () => {
     } catch {
       user.value = null;
     } finally {
-      isHydrated.value = true;
+      isSessionChecked.value = true;
     }
   }
 
@@ -30,14 +30,14 @@ export const useAuthStore = defineStore("auth", () => {
     }
 
     user.value = null;
-    isHydrated.value = true;
+    isSessionChecked.value = true;
   }
 
   return {
     user,
-    isHydrated,
-    isAuthenticated,
-    hydrateSession,
+    isSessionChecked,
+    isLoggedIn,
+    checkSession,
     logout,
   };
 });

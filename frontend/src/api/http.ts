@@ -1,14 +1,17 @@
+//定義Api錯誤回報的架構
 export interface ApiErrorPayload {
   code: string;
   message: string;
 }
 
+//判斷Api封裝回傳的資料架構
 export interface ApiEnvelope<T> {
   success: boolean;
   data: T | null;
   error: ApiErrorPayload | null;
 }
 
+//定義Api請求錯誤的類別，使用extends延伸Error類別，新增status和code屬性，呼叫父類別的建構函數，並設定name、status和code屬性。
 export class ApiRequestError extends Error {
   status: number;
   code?: string;
@@ -21,6 +24,7 @@ export class ApiRequestError extends Error {
   }
 }
 
+//從.env檔案取出api的URL，並定義ApiUrl的建構函數
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? "/api";
 function buildApiUrl(path: string): string {
   const base = API_BASE_URL.endsWith("/")
@@ -31,6 +35,7 @@ function buildApiUrl(path: string): string {
   return `${base}${normalizedPath}`;
 }
 
+//建立共用的request函式，接受API路徑和RequestInit參數，回傳泛型T的Promise
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(buildApiUrl(path), {
     credentials: "include",
