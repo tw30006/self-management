@@ -1,1 +1,9 @@
-- 我是前端工程師，後端不熟。請在協助建立後端 API 時，同步以註解與簡短說明解釋每個部分的用途，讓我能理解而不只是複製貼上。
+---
+description: [Deprecated] 個人偏好已整併到根目錄規則檔
+---
+
+# Deprecated
+
+此檔內容已整併，請改維護：
+
+- `.github/instructions/20-backend.rule.md`

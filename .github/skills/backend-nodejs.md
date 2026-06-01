@@ -2,8 +2,6 @@
 description: Node.js + Express RESTful API 領域知識，包含專案架構、設計模式、安全性、測試等詳細說明與範例。USE FOR：建立新路由、controller、service；錯誤處理模式；安全性設計；撰寫測試；分頁 API 設計。
 ---
 
-> Legacy 位置：正式維護版請改用 `.github/skills/backend-nodejs.md`。
-
 # Node.js + Express RESTful API 知識庫
 
 本檔案為詳細的領域知識與程式碼範例，供 Copilot 在需要時參照。

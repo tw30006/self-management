@@ -29,6 +29,10 @@ export function buildGoogleOAuthUrl(state: string): string {
   const clientId = requireEnv("GOOGLE_CLIENT_ID");
   const callbackUrl = requireEnv("GOOGLE_CALLBACK_URL");
 
+  //state:狀態值，用來防止CSRF攻擊，在登入前後保留一些臨時狀態
+  //access_type=offline: 讓google在適合的情況下發送refresh token，讓你之後能在沒有使用者再次登入的狀況下更新acess token
+  //scope: 我跟google申請要那些資料權限
+  //prompt=consent:強制顯示授權同意畫面，讓使用者重新確認權限
   const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
   url.searchParams.set("client_id", clientId);
   url.searchParams.set("redirect_uri", callbackUrl);
