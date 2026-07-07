@@ -1,6 +1,13 @@
-/// <reference types="jest" />
 // tests/auth.test.ts
-import { jest } from "@jest/globals";
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+} from "@jest/globals";
 // Auth API 整合測試（Google OAuth）
 
 import jwt from "jsonwebtoken";

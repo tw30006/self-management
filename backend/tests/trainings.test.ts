@@ -1,5 +1,13 @@
-/// <reference types="jest" />
-// tests/trainings.test.ts
+import {
+  afterAll,
+  beforeAll,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  jest,
+  afterEach,
+} from "@jest/globals";
 // Training CRUD API 整合測試
 // 每個測試案例都需要有效的 JWT token
 
